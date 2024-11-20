@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "911343565754",
+    "project_id": "chat-app-c360c",
+    "storage_bucket": "chat-app-c360c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:911343565754:android:241bdc5dc45d90f7ccfb83",
+        "android_client_info": {
+          "package_name": "com.example.yapzap"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "911343565754-3j1mgehfntue887vudpuqdokr6r6j14s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.yapzap",
+            "certificate_hash": "e50029f2923a68a17731dc08b0f448ee4ada61c2"
+          }
+        },
+        {
+          "client_id": "911343565754-ml0rhtsp466pa0nmq3b7dfk5h8l1tnlh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWm0a-u1Bpi2RnnBmQrJrfhDCvQzdqGAU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "911343565754-ml0rhtsp466pa0nmq3b7dfk5h8l1tnlh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

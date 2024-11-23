@@ -27,6 +27,7 @@
 //     );
 //   }
 // }
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import '../screens/navigation_screen.dart';
 import 'screens/login_screen_demo.dart';
@@ -35,7 +36,9 @@ import 'screens/home_page_demo.dart';
 import 'screens/chat_screen.dart';
 import 'screens/forgot_password_screen_demo.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -48,13 +51,15 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => NavigationTestScreen(),
-        '/login': (context) => LoginScreen(),
-        '/register': (context) => RegisterScreen(),
-        '/homepage': (context) => HomePage(),
-        '/chatscreen': (context) => ChatScreen(),
-        '/forgotpassword': (context) => ForgotPasswordScreen(),
+        '/login': (context) => LoginScreenDemo(),
+        '/register': (context) => RegisterScreenDemo(),
+        '/homepage': (context) => HomePageDemo(),
+        // '/chatscreen': (context) => WebRTCChatApp(),
+        '/forgotpassword': (context) => ConnectUsersPage(),
       },
     );
   }
 }
+
+
 

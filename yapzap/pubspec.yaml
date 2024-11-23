@@ -29,7 +29,7 @@ flutter:
 
   assets:
     - assets/animations/
-    - assets/images/
+    - assets/images/yapzap_logo.png
     - assets/fonts/
 
     

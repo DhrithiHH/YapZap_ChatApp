@@ -18,9 +18,21 @@ class NavigationTestScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
+              Navigator.pushNamed(context, '/loginf');
+            },
+            child: Text('Go to Login Page'),
+          ),
+          ElevatedButton(
+            onPressed: () {
               Navigator.pushNamed(context, '/register');
             },
             child: Text('Go to Register Screen'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/registerf');
+            },
+            child: Text('Go to Register page'),
           ),
           ElevatedButton(
             onPressed: () {

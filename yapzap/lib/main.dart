@@ -33,8 +33,11 @@ import '../screens/navigation_screen.dart';
 import 'screens/login_screen_demo.dart';
 import 'screens/register_screen_demo.dart';
 import 'screens/home_page_demo.dart';
-import 'screens/chat_screen.dart';
+//import 'screens/chat_screen.dart';
 import 'screens/forgot_password_screen_demo.dart';
+import 'screens/splash_page.dart';
+import 'screens/login_page.dart';
+import 'screens/register_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,16 +53,16 @@ class MyApp extends StatelessWidget {
       title: 'Navigation Test',
       initialRoute: '/',
       routes: {
-        '/': (context) => NavigationTestScreen(),
+        '/': (context) => const SplashPage(),
+        '/onboarding': (context) => NavigationTestScreen(),
         '/login': (context) => LoginScreenDemo(),
+        '/loginf': (context) => const LoginPage(),
         '/register': (context) => RegisterScreenDemo(),
+        '/registerf': (context) => const RegisterPage(),
         '/homepage': (context) => HomePageDemo(),
         // '/chatscreen': (context) => WebRTCChatApp(),
-        '/forgotpassword': (context) => ConnectUsersPage(),
+        '/forgotpassword': (context) => const ConnectUsersPage(),
       },
     );
   }
 }
-
-
-

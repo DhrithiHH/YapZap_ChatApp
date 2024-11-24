@@ -1,7 +1,7 @@
-// TODO Implement this library.
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class RegisterScreenDemo extends StatefulWidget {
   @override
@@ -9,18 +9,20 @@ class RegisterScreenDemo extends StatefulWidget {
 }
 
 class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
-  final _userIdController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final TextEditingController _userIdController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Check if User ID already exists in Firestore
   Future<bool> _checkIfUserIdExists(String userId) async {
     final userDoc = await _firestore.collection('users').doc(userId).get();
     return userDoc.exists;
   }
 
+  // Check if Email already exists in Firestore
   Future<bool> _checkIfEmailExists(String email) async {
     final querySnapshot = await _firestore
         .collection('users')
@@ -29,67 +31,78 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
     return querySnapshot.docs.isNotEmpty;
   }
 
-  void _register() async {
+  // Registration function
+  Future<void> _register() async {
     try {
       final userId = _userIdController.text.trim();
       final username = _usernameController.text.trim();
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
+      _auth.setLanguageCode('en'); // Replace 'en' with the desired locale code
 
+      // Validate input fields
       if (userId.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please fill in all fields')),
+          const SnackBar(content: Text('Please fill in all fields')),
         );
         return;
       }
 
-      // Check if userId exists
+      // Check if User ID already exists
       if (await _checkIfUserIdExists(userId)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('User ID already exists. Please choose another.')),
+          const SnackBar(content: Text('User ID already exists. Please choose another.')),
         );
         return;
       }
 
-      // Check if email exists
+      // Check if Email already exists
       if (await _checkIfEmailExists(email)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Email already exists. Please log in.')),
+          const SnackBar(content: Text('Email already exists. Please log in.')),
         );
         return;
       }
 
-      // Create user in Firebase Authentication
+      // Register user with Firebase Auth
       // ignore: unused_local_variable
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Create user document in Firestore
-      await _firestore.collection('users').doc(userId).set({
+      // Add user data to Firestore
+      Map<String, dynamic> newUser = {
         'userId': userId,
         'username': username,
         'email': email,
         'lastSeen': FieldValue.serverTimestamp(),
-        'profilePic': '', // Placeholder, can be updated later
+        'profilePic': '', // Empty profile picture initially
         'status': 'offline', // Default status
-        'contacts': [], // Empty contact list
-        'archiveMessages': [], // No archived messages initially
+        'contacts': [], // Empty contacts list
+        'archiveMessages': [], // Empty archive
         'additionalInfo': {
-          'bio': '', // Placeholder bio
-          'location': '', // Placeholder location
-          'birthdate': null, // Placeholder birthdate
-          'phoneNumber': '', // Placeholder phone number
+          'bio': '',
+          'location': '',
+          'birthdate': null,
+          'phoneNumber': '',
         },
-      });
+      };
 
+      // Create users collection if it doesn't exist and add the new user
+      await _firestore.collection('users').doc(userId).set(newUser);
+
+      // Clear input fields after successful registration
+      _userIdController.clear();
+      _usernameController.clear();
+      _emailController.clear();
+      _passwordController.clear();
+
+      // Show success message and navigate to login or homepage
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration successful!')),
+        const SnackBar(content: Text('Registration successful!')),
       );
-
-      // Navigate to login screen or another page
-      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginScreenDemo()));
+      Navigator.pushReplacementNamed(context, '/homepage');
     } on FirebaseAuthException catch (e) {
       String message = 'An error occurred, please try again.';
       if (e.code == 'email-already-in-use') {
@@ -97,10 +110,12 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
       } else if (e.code == 'weak-password') {
         message = 'Password must be at least 6 characters.';
       }
-
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An unexpected error occurred: $e')),
       );
     }
   }
@@ -109,59 +124,61 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Register Screen Demo'),
+        title: const Text('Register Screen Demo'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _userIdController,
-              decoration: const InputDecoration(
-                labelText: 'User ID',
-                border: OutlineInputBorder(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextField(
+                controller: _userIdController,
+                decoration: const InputDecoration(
+                  labelText: 'User ID',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 16.0),
-            TextField(
-              controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: 'Username',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16.0),
+              TextField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            SizedBox(height: 16.0),
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16.0),
+              TextField(
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
               ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            SizedBox(height: 16.0),
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16.0),
+              TextField(
+                controller: _passwordController,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
               ),
-              obscureText: true,
-            ),
-            SizedBox(height: 16.0),
-            ElevatedButton(
-              onPressed: _register,
-              child: Text('Register'),
-            ),
-            TextButton(
-              onPressed: () {
-                // Navigate to login screen
-                // Navigator.push(context, MaterialPageRoute(builder: (context) => LoginScreenDemo()));
-              },
-              child: Text('Already have an account? Login here'),
-            ),
-          ],
+              const SizedBox(height: 16.0),
+              ElevatedButton(
+                onPressed: _register,
+                child: const Text('Register'),
+              ),
+              TextButton(
+                onPressed: () {
+                  // Navigate to login screen
+                  Navigator.pushNamed(context, '/login');
+                },
+                child: const Text('Already have an account? Login here'),
+              ),
+            ],
+          ),
         ),
       ),
     );

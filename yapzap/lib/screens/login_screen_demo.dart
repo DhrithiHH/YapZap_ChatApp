@@ -1,6 +1,8 @@
 // TODO Implement this library.
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:yapzap/screens/home_page_demo.dart';
+// import 'register_screen_demo.dart';
 
 class LoginScreenDemo extends StatefulWidget {
   @override
@@ -62,7 +64,7 @@ class _LoginScreenDemoState extends State<LoginScreenDemo> {
           children: [
             TextField(
               controller: _emailController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Email',
                 border: OutlineInputBorder(),
               ),
@@ -71,7 +73,7 @@ class _LoginScreenDemoState extends State<LoginScreenDemo> {
             SizedBox(height: 16.0),
             TextField(
               controller: _passwordController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Password',
                 border: OutlineInputBorder(),
               ),
@@ -79,13 +81,26 @@ class _LoginScreenDemoState extends State<LoginScreenDemo> {
             ),
             SizedBox(height: 16.0),
             ElevatedButton(
-              onPressed: _login,
-              child: Text('Login'),
+              onPressed: () async {
+                  try {
+                    // Call the existing `_register` function
+                    _login();
+
+                    // Navigate to the login screen after successful registration
+                    Navigator.pushNamed(context, '/homepage');
+                  } catch (e) {
+                    // Handle any errors that might occur during registration
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: ${e.toString()}')),
+                    );
+                  }
+                },
+              child: const Text('Login'),
             ),
             TextButton(
               onPressed: () {
                 // Navigate to the registration screen
-                // Navigator.push(context, MaterialPageRoute(builder: (context) => RegisterScreen()));
+                Navigator.pushNamed(context, '/register');
               },
               child: Text('Don\'t have an account? Register here'),
             ),

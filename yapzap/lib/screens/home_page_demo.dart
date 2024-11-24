@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'chat_screen.dart';
 import 'connect.dart';
+
 class HomePageDemo extends StatefulWidget {
   @override
   _HomePageDemoState createState() => _HomePageDemoState();
@@ -42,7 +43,7 @@ class _HomePageDemoState extends State<HomePageDemo> {
 
   @override
   Widget build(BuildContext context) {
-    final themeGreen = Color(0xFF00A86B); // Green theme color
+    final themeGreen = const Color(0xFF00A86B); // Green theme color
 
     return Scaffold(
       appBar: AppBar(
@@ -66,103 +67,119 @@ class _HomePageDemoState extends State<HomePageDemo> {
           IconButton(
             icon: const Icon(Icons.menu, color: Colors.white),
             onPressed: () {
-              // Navigate to settings page
+              // Add navigation to settings if needed
             },
           ),
         ],
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: _currentUserId != null
-            ? _firestore.collection('users').doc(_currentUserId).snapshots()
-            : null,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: _currentUserId == null
+          ? const Center(child: CircularProgressIndicator())
+          : StreamBuilder<DocumentSnapshot>(
+              stream: _firestore.collection('users').doc(_currentUserId).snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-            return const Center(
-              child: Text('Failed to load contacts. Please try again.'),
-            );
-          }
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text('Failed to load contacts. Please try again.'),
+                  );
+                }
 
-          final userDoc = snapshot.data!;
-          final contacts = List<String>.from(userDoc['contacts'] ?? []);
+                final userDoc = snapshot.data;
 
-          // Filter contacts by search query
-          final filteredContacts = contacts.where((contactId) {
-            return contactId.toLowerCase().contains(_searchQuery.toLowerCase());
-          }).toList();
+                if (userDoc == null || !userDoc.exists) {
+                  return const Center(
+                    child: Text('User data not found. Please check your account.'),
+                  );
+                }
 
-          return Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  itemCount: filteredContacts.length,
-                  itemBuilder: (context, index) {
-                    final contactId = filteredContacts[index];
+                // Safely cast the document data to a Map
+                final data = userDoc.data() as Map<String, dynamic>;
+                final contacts = List<String>.from(data['contacts'] ?? []);
 
-                    return FutureBuilder<DocumentSnapshot>(
-                      future: _firestore.collection('users').doc(contactId).get(),
-                      builder: (context, contactSnapshot) {
-                        if (contactSnapshot.connectionState == ConnectionState.waiting) {
-                          return const ListTile(
-                            title: Text('Loading...'),
-                          );
-                        }
+                // Filter contacts based on search query
+                final filteredContacts = contacts.where((contactId) {
+                  return contactId.toLowerCase().contains(_searchQuery.toLowerCase());
+                }).toList();
 
-                        if (contactSnapshot.hasError || !contactSnapshot.hasData) {
-                          return const ListTile(
-                            title: Text('Error loading contact'),
-                          );
-                        }
+                return Column(
+                  children: [
+                    Expanded(
+                      child: filteredContacts.isEmpty
+                          ? const Center(
+                              child: Text('No contacts found.'),
+                            )
+                          : ListView.builder(
+                              itemCount: filteredContacts.length,
+                              itemBuilder: (context, index) {
+                                final contactId = filteredContacts[index];
 
-                        final contactData = contactSnapshot.data!;
-                        final username = contactData['username'] ?? 'Unknown User';
-                        final profilePic = contactData['profilePic'] ?? '';
+                                return FutureBuilder<DocumentSnapshot>(
+                                  future: _firestore.collection('users').doc(contactId).get(),
+                                  builder: (context, contactSnapshot) {
+                                    if (contactSnapshot.connectionState == ConnectionState.waiting) {
+                                      return const ListTile(
+                                        title: Text('Loading...'),
+                                      );
+                                    }
 
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage: profilePic.isNotEmpty
-                                ? NetworkImage(profilePic)
-                                : null,
-                            child: profilePic.isEmpty
-                                ? const Icon(Icons.person, color: Colors.white)
-                                : null,
-                          ),
-                          title: Text(username),
-                          subtitle: Text('UserID: $contactId'),
-                          tileColor: Colors.white,
-                          onTap: () {
-                            // Navigate to Chat Screen with userId and peerId
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => WebRTCChatApp(
-                                  userId: _currentUserId!,
-                                  peerId: contactId,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: FloatingActionButton(
-                  backgroundColor: themeGreen,
-                  onPressed: _navigateToConnectUsersPage,
-                  child: const Icon(Icons.add, color: Colors.white),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                                    if (contactSnapshot.hasError ||
+                                        !contactSnapshot.hasData ||
+                                        !contactSnapshot.data!.exists) {
+                                      return const ListTile(
+                                        title: Text('Error loading contact'),
+                                      );
+                                    }
+
+                                    final contactData = contactSnapshot.data!;
+                                    final contactMap = contactData.data() as Map<String, dynamic>;
+                                    final username = contactMap['username'] ?? 'Unknown User';
+                                    final profilePic = contactMap['profilePic'] ?? '';
+
+                                    return ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundImage: profilePic.isNotEmpty
+                                            ? NetworkImage(profilePic)
+                                            : null,
+                                        child: profilePic.isEmpty
+                                            ? const Icon(Icons.person, color: Colors.white)
+                                            : null,
+                                      ),
+                                      title: Text(username),
+                                      subtitle: Text('UserID: $contactId'),
+                                      tileColor: Colors.white,
+                                      onTap: () {
+                                        // Navigate to Chat Screen with userId and peerId
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => WebRTCChatApp(
+                                              userId: _currentUserId!,
+                                              peerId: contactId,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: FloatingActionButton(
+                        backgroundColor: themeGreen,
+                        onPressed: _navigateToConnectUsersPage,
+                        child: const Icon(Icons.add, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
     );
   }
 }

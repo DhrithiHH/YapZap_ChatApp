@@ -37,6 +37,13 @@
             {
               "client_id": "911343565754-ml0rhtsp466pa0nmq3b7dfk5h8l1tnlh.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "911343565754-ej5u2u4llc1utfbol00ppep5njv8vfc3.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.yapzap"
+              }
             }
           ]
         }

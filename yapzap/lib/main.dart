@@ -29,6 +29,7 @@
 // }
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:yapzap/screens/connect.dart';
 import '../screens/navigation_screen.dart';
 import 'screens/login_screen_demo.dart';
 import 'screens/register_screen_demo.dart';
@@ -61,7 +62,7 @@ class MyApp extends StatelessWidget {
         '/registerf': (context) => const RegisterPage(),
         // '/homepage': (context) => HomePageDemo(),
         // '/chatscreen': (context) => WebRTCChatApp(),
-        '/forgotpassword': (context) => const ConnectUsersPage(),
+        '/forgotpassword': (context) => ForgotPasswordPage(),
       },
     );
   }

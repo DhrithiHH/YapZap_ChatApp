@@ -17,7 +17,6 @@ class _HomePageDemoState extends State<HomePageDemo> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _searchQuery = '';
-  bool _isPasswordVisible = false; // State for toggling password visibility
 
   @override
   Widget build(BuildContext context) {
@@ -32,80 +31,35 @@ class _HomePageDemoState extends State<HomePageDemo> {
         ),
         child: Column(
           children: [
-            // AppBar with Search
+            // Search Bar
             Container(
-              padding:
-                  const EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0),
-              color: Colors.transparent,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search by user ID...',
-                        hintStyle: const TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.2),
-                        prefixIcon:
-                            const Icon(Icons.search, color: Colors.white),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Password Field Example
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+              padding: const EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0),
               child: TextField(
-                obscureText: !_isPasswordVisible,
+                controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Enter your password',
+                  hintText: 'Search by user ID...',
                   hintStyle: const TextStyle(color: Colors.white70),
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.2),
+                  prefixIcon: const Icon(Icons.search, color: Colors.white),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
-                  ),
                 ),
                 style: const TextStyle(color: Colors.white),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
               ),
             ),
 
             // Contacts List
             Expanded(
               child: StreamBuilder<DocumentSnapshot>(
-                stream: _firestore
-                    .collection('users')
-                    .doc(widget.userId)
-                    .snapshots(),
+                stream: _firestore.collection('users').doc(widget.userId).snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -113,17 +67,13 @@ class _HomePageDemoState extends State<HomePageDemo> {
 
                   if (snapshot.hasError) {
                     return const Center(
-                      child: Text(
-                          'Failed to load contacts. Please try again later.'),
+                      child: Text('Failed to load contacts. Please try again later.'),
                     );
                   }
 
-                  if (!snapshot.hasData ||
-                      snapshot.data == null ||
-                      !snapshot.data!.exists) {
+                  if (!snapshot.hasData || snapshot.data == null || !snapshot.data!.exists) {
                     return const Center(
-                      child: Text(
-                          'User data not found. Please check your account.'),
+                      child: Text('User data not found. Please check your account.'),
                     );
                   }
 
@@ -133,31 +83,30 @@ class _HomePageDemoState extends State<HomePageDemo> {
 
                   // Filter contacts based on search query
                   final filteredContacts = contacts.where((contactId) {
-                    return contactId
-                        .toLowerCase()
-                        .contains(_searchQuery.toLowerCase());
+                    return contactId.toLowerCase().contains(_searchQuery.toLowerCase());
                   }).toList();
 
                   return filteredContacts.isEmpty
                       ? const Center(
-                          child: Text('No contacts found.',
-                              style: TextStyle(color: Colors.white)))
+                          child: Text(
+                            'No contacts found.',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        )
                       : ListView.builder(
                           itemCount: filteredContacts.length,
                           itemBuilder: (context, index) {
                             final contactId = filteredContacts[index];
 
                             return FutureBuilder<DocumentSnapshot>(
-                              future: _firestore
-                                  .collection('users')
-                                  .doc(contactId)
-                                  .get(),
+                              future: _firestore.collection('users').doc(contactId).get(),
                               builder: (context, contactSnapshot) {
-                                if (contactSnapshot.connectionState ==
-                                    ConnectionState.waiting) {
+                                if (contactSnapshot.connectionState == ConnectionState.waiting) {
                                   return const ListTile(
-                                    title: Text('Loading...',
-                                        style: TextStyle(color: Colors.white)),
+                                    title: Text(
+                                      'Loading...',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
                                   );
                                 }
 
@@ -165,36 +114,31 @@ class _HomePageDemoState extends State<HomePageDemo> {
                                     !contactSnapshot.hasData ||
                                     !contactSnapshot.data!.exists) {
                                   return const ListTile(
-                                    title: Text('Error loading contact',
-                                        style: TextStyle(color: Colors.white)),
+                                    title: Text(
+                                      'Error loading contact',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
                                   );
                                 }
 
-                                final contactData = contactSnapshot.data!.data()
-                                    as Map<String, dynamic>;
-                                final username =
-                                    contactData['username'] ?? 'Unknown User';
-                                final profilePic =
-                                    contactData['profilePic'] ?? '';
+                                final contactData = contactSnapshot.data!.data() as Map<String, dynamic>;
+                                final username = contactData['username'] ?? 'Unknown User';
+                                final profilePic = contactData['profilePic'] ?? '';
 
                                 return ListTile(
                                   leading: CircleAvatar(
-                                    backgroundImage: profilePic.isNotEmpty
-                                        ? NetworkImage(profilePic)
-                                        : null,
+                                    backgroundImage: profilePic.isNotEmpty ? NetworkImage(profilePic) : null,
                                     child: profilePic.isEmpty
-                                        ? const Icon(Icons.person,
-                                            color: Colors.white)
+                                        ? const Icon(Icons.person, color: Colors.white)
                                         : null,
                                   ),
-                                  title: Text(username,
-                                      style:
-                                          const TextStyle(color: Colors.white)),
-                                  subtitle: Text('UserID: $contactId',
-                                      style: const TextStyle(
-                                          color: Colors.white70)),
+                                  title: Text(username, style: const TextStyle(color: Colors.white)),
+                                  subtitle: Text(
+                                    'UserID: $contactId',
+                                    style: const TextStyle(color: Colors.white70),
+                                  ),
                                   onTap: () {
-                                    // Navigate to Chat Screen with userId and peerId
+                                    // Navigate to Chat Screen
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -212,24 +156,26 @@ class _HomePageDemoState extends State<HomePageDemo> {
                         );
                 },
               ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: FloatingActionButton(
-                  backgroundColor: themeGreen,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ConnectUsersPage(),
-                      ),
-                    );
-                  },
-                  child: const Icon(Icons.add, color: Colors.white),
-                ),
+            ),
+
+            // Floating Action Button
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: FloatingActionButton(
+                backgroundColor: const Color(0xFF00A86B),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ConnectPage(userId: widget.userId),
+                    ),
+                  );
+                },
+                child: const Icon(Icons.add, color: Colors.white),
               ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 
-// Import your custom button widget
+// Custom Button Widget
 import '../widgets/custom_button.dart';
 
 class LoginPage extends StatelessWidget {
@@ -12,7 +12,7 @@ class LoginPage extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // Bubble Animation Background
+          // Animated Background with Bubbles
           const AnimatedBackground(),
 
           // Login Form
@@ -36,8 +36,8 @@ class LoginPage extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white, // White text for contrast
-                    fontFamily: 'ComicSans', // Playful font
+                    color: Colors.white,
+                    fontFamily: 'ComicSans',
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -58,20 +58,7 @@ class LoginPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 FadeTransitionWidget(
-                  child: TextField(
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      labelStyle: const TextStyle(color: Colors.white),
-                      prefixIcon: const Icon(Icons.lock, color: Colors.white),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
+                  child: PasswordField(),
                 ),
                 const SizedBox(height: 30),
                 CustomButton(
@@ -120,7 +107,46 @@ class LoginPage extends StatelessWidget {
   }
 }
 
-// Animated Background with Floating Bubbles and Gradient
+// Password Field with Visibility Toggle
+class PasswordField extends StatefulWidget {
+  @override
+  _PasswordFieldState createState() => _PasswordFieldState();
+}
+
+class _PasswordFieldState extends State<PasswordField> {
+  bool _isObscured = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      obscureText: _isObscured,
+      decoration: InputDecoration(
+        labelText: 'Password',
+        labelStyle: const TextStyle(color: Colors.white),
+        prefixIcon: const Icon(Icons.lock, color: Colors.white),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _isObscured ? Icons.visibility : Icons.visibility_off,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            setState(() {
+              _isObscured = !_isObscured;
+            });
+          },
+        ),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.2),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+// Animated Background
 class AnimatedBackground extends StatefulWidget {
   const AnimatedBackground({Key? key}) : super(key: key);
 
@@ -150,29 +176,39 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFF7ED321),
-            Color(0xFF4A90E2)
-          ], // Green to Blue Gradient
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Stack(
+      children: [
+        // Gradient Background
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFFFA726), // Orange
+                Color(0xFFFF4081), // Pink
+                Color(0xFF7B1FA2), // Purple
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
         ),
-      ),
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return CustomPaint(
-            painter: BubblePainter(bubbles, _controller.value),
-          );
-        },
-      ),
+
+        // Bubble Animation
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return CustomPaint(
+              painter: BubblePainter(bubbles, _controller.value),
+              size: MediaQuery.of(context).size, // Ensure full screen
+            );
+          },
+        ),
+      ],
     );
   }
 }
 
+// Bubble Model
 class Bubble {
   late double x;
   late double y;
@@ -181,18 +217,19 @@ class Bubble {
 
   Bubble() {
     final random = Random();
-    x = random.nextDouble(); // Fractional x-coordinate
-    y = random.nextDouble(); // Fractional y-coordinate
+    x = random.nextDouble();
+    y = random.nextDouble();
     radius = random.nextDouble() * 40 + 10; // Radius between 10 and 50
     color = Color.fromRGBO(
-      random.nextInt(256),
-      random.nextInt(256),
-      random.nextInt(256),
+      random.nextInt(200) + 55, // Avoid very dark colors
+      random.nextInt(200) + 55,
+      random.nextInt(200) + 55,
       0.4 + random.nextDouble() * 0.3, // Transparency between 0.4 and 0.7
     );
   }
 }
 
+// Bubble Painter
 class BubblePainter extends CustomPainter {
   final List<Bubble> bubbles;
   final double progress;
@@ -205,11 +242,9 @@ class BubblePainter extends CustomPainter {
 
     for (var bubble in bubbles) {
       final dx = bubble.x * size.width;
-      final dy = (bubble.y + progress) % 1.0 * size.height;
-      final effectiveY = dy < 0 ? dy + size.height : dy;
-
+      final dy = (bubble.y + progress * 0.1) % 1.0 * size.height;
       paint.color = bubble.color;
-      canvas.drawCircle(Offset(dx, effectiveY), bubble.radius, paint);
+      canvas.drawCircle(Offset(dx, dy), bubble.radius, paint);
     }
   }
 

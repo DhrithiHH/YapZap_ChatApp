@@ -140,7 +140,7 @@ class _HomePageDemoState extends State<HomePageDemo> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ConnectUsersPage(),
+                        builder: (context) => ConnectPage(userId: widget.userId),
                       ),
                     );
                   },

@@ -59,7 +59,7 @@ class MyApp extends StatelessWidget {
         '/loginf': (context) => const LoginPage(),
         '/register': (context) => RegisterScreenDemo(),
         '/registerf': (context) => const RegisterPage(),
-        '/homepage': (context) => HomePageDemo(),
+        // '/homepage': (context) => HomePageDemo(),
         // '/chatscreen': (context) => WebRTCChatApp(),
         '/forgotpassword': (context) => const ConnectUsersPage(),
       },

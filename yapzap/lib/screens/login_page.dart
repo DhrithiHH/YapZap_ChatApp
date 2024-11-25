@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 
+// Import your custom button widget
 import '../widgets/custom_button.dart';
 
 class LoginPage extends StatelessWidget {
@@ -12,7 +13,7 @@ class LoginPage extends StatelessWidget {
       body: Stack(
         children: [
           // Bubble Animation Background
-          AnimatedBackground(),
+          const AnimatedBackground(),
 
           // Login Form
           Padding(
@@ -119,7 +120,7 @@ class LoginPage extends StatelessWidget {
   }
 }
 
-// Animated Background with Floating Bubbles
+// Animated Background with Floating Bubbles and Gradient
 class AnimatedBackground extends StatefulWidget {
   const AnimatedBackground({Key? key}) : super(key: key);
 
@@ -149,13 +150,25 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: BubblePainter(bubbles, _controller.value),
-        );
-      },
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF7ED321),
+            Color(0xFF4A90E2)
+          ], // Green to Blue Gradient
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: BubblePainter(bubbles, _controller.value),
+          );
+        },
+      ),
     );
   }
 }
@@ -168,14 +181,14 @@ class Bubble {
 
   Bubble() {
     final random = Random();
-    x = random.nextDouble();
-    y = random.nextDouble();
-    radius = random.nextDouble() * 30 + 10;
+    x = random.nextDouble(); // Fractional x-coordinate
+    y = random.nextDouble(); // Fractional y-coordinate
+    radius = random.nextDouble() * 40 + 10; // Radius between 10 and 50
     color = Color.fromRGBO(
       random.nextInt(256),
       random.nextInt(256),
       random.nextInt(256),
-      0.5,
+      0.4 + random.nextDouble() * 0.3, // Transparency between 0.4 and 0.7
     );
   }
 }
@@ -189,19 +202,22 @@ class BubblePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint();
+
     for (var bubble in bubbles) {
       final dx = bubble.x * size.width;
       final dy = (bubble.y + progress) % 1.0 * size.height;
+      final effectiveY = dy < 0 ? dy + size.height : dy;
+
       paint.color = bubble.color;
-      canvas.drawCircle(Offset(dx, dy), bubble.radius, paint);
+      canvas.drawCircle(Offset(dx, effectiveY), bubble.radius, paint);
     }
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-// Widget for Fade Transition
+// Fade Transition Widget
 class FadeTransitionWidget extends StatefulWidget {
   final Widget child;
 

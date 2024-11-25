@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:yapzap/screens/home_page_demo.dart';
 
 class RegisterScreenDemo extends StatefulWidget {
   @override
@@ -38,7 +38,6 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
       final username = _usernameController.text.trim();
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
-      _auth.setLanguageCode('en'); // Replace 'en' with the desired locale code
 
       // Validate input fields
       if (userId.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty) {
@@ -89,20 +88,20 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
         },
       };
 
-      // Create users collection if it doesn't exist and add the new user
       await _firestore.collection('users').doc(userId).set(newUser);
 
-      // Clear input fields after successful registration
-      _userIdController.clear();
-      _usernameController.clear();
-      _emailController.clear();
-      _passwordController.clear();
+      // Navigate to HomePageDemo and pass userId
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomePageDemo(userId: userId),
+        ),
+      );
 
-      // Show success message and navigate to login or homepage
+      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Registration successful!')),
       );
-      Navigator.pushReplacementNamed(context, '/homepage');
     } on FirebaseAuthException catch (e) {
       String message = 'An error occurred, please try again.';
       if (e.code == 'email-already-in-use') {

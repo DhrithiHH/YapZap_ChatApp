@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// ignore: library_prefixes//
+// ignore: library_prefixes
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class WebRTCChatApp extends StatefulWidget {
@@ -11,7 +11,6 @@ class WebRTCChatApp extends StatefulWidget {
   const WebRTCChatApp({required this.userId, required this.peerId, super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _WebRTCChatAppState createState() => _WebRTCChatAppState();
 }
 
@@ -90,55 +89,71 @@ class _WebRTCChatAppState extends State<WebRTCChatApp> {
   }
 
   Future<void> _fetchPreviousMessages() async {
-  // Sort the user IDs to ensure a consistent document ID
-  List<String> users = [widget.userId, widget.peerId];
-  users.sort(); // Sorts the user IDs
-
-  String chatId = '${users[0]}_${users[1]}'; // Generate the chat document ID
-
-  final snapshot = await FirebaseFirestore.instance
-      .collection('messages')
-      .doc(chatId)  // Use sorted chatId
-      .collection('chatMessages')
-      .orderBy('timestamp')
-      .get();
-
-  setState(() {
-    messages = snapshot.docs
-        .map((doc) => {'from': doc['from'], 'message': doc['message']})
-        .toList();
-  });
-}
-
-void _sendMessage() {
-  final message = messageController.text.trim();
-  if (message.isNotEmpty) {
-    // Sort the user IDs to ensure a consistent document ID
     List<String> users = [widget.userId, widget.peerId];
-    users.sort(); // Sorts the user IDs
+    users.sort();
 
-    String chatId = '${users[0]}_${users[1]}'; // Generate the chat document ID
+    String chatId = '${users[0]}_${users[1]}';
 
-    dataChannel?.send(RTCDataChannelMessage(message));
-
-    // Save to Firebase with the sorted chatId
-    FirebaseFirestore.instance
+    final snapshot = await FirebaseFirestore.instance
         .collection('messages')
-        .doc(chatId)  // Use sorted chatId
+        .doc(chatId)
         .collection('chatMessages')
-        .add({
-      'from': widget.userId,
-      'message': message,
-      'timestamp': Timestamp.now(),
-    });
+        .orderBy('timestamp')
+        .get();
 
     setState(() {
-      messages.add({'from': widget.userId, 'message': message});
-      messageController.clear();
+      messages = snapshot.docs
+          .map((doc) => {'from': doc['from'], 'message': doc['message']})
+          .toList();
     });
   }
-}
 
+  Future<void> _acceptRequest() async {
+    List<String> users = [widget.userId, widget.peerId];
+    users.sort();
+
+    String chatId = '${users[0]}_${users[1]}';
+
+    // Remove the request message
+    await FirebaseFirestore.instance.collection('messages').doc(chatId).delete();
+
+    setState(() {
+      messages.removeWhere((msg) => msg['from'] == widget.peerId);
+    });
+
+    // You can now start the chat or transition UI as needed
+  }
+
+  void _sendMessage() {
+  final message = messageController.text.trim();
+  if (message.isNotEmpty) {
+    // Create a sorted list of user IDs to generate a unique chatId
+    List<String> users = [widget.userId, widget.peerId];
+    users.sort(); // Sort the user IDs to ensure consistent chatId
+
+    String chatId = '${users[0]}_${users[1]}'; // Create chatId based on sorted user IDs
+
+    // Send the message using WebRTC DataChannel (if applicable)
+
+    // Add the message to Firestore in the chatMessages subcollection
+    FirebaseFirestore.instance
+        .collection('messages')
+        .doc(chatId) // Reference to the chat document
+        .collection('chatMessages') // Subcollection to store messages
+        .add({
+      'from': widget.userId, // Sender's userId
+      'message': message, // The actual message content
+      'timestamp': Timestamp.now(), // Firestore timestamp
+    });
+
+    // Update the UI with the new message
+    setState(() {
+      messages.add({'from': widget.userId, 'message': message});
+      messageController.clear(); // Clear the input field after sending
+    });
+    dataChannel?.send(RTCDataChannelMessage(message));
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -174,6 +189,11 @@ void _sendMessage() {
               IconButton(icon: const Icon(Icons.send), onPressed: _sendMessage),
             ],
           ),
+          if (messages.any((msg) => msg['from'] == widget.peerId))
+            ElevatedButton(
+              onPressed: _acceptRequest,
+              child: const Text('Accept Request'),
+            ),
         ],
       ),
     );

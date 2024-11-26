@@ -79,6 +79,8 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
         'profilePic': '', // Empty profile picture initially
         'status': 'offline', // Default status
         'contacts': [], // Empty contacts list
+        'requestR': [], // Empty contacts list
+        'requestS': [], // Empty contacts list
         'archiveMessages': [], // Empty archive
         'additionalInfo': {
           'bio': '',

@@ -52,6 +52,12 @@ class NavigationTestScreen extends StatelessWidget {
             },
             child: Text('Go to Forgot Password Screen'),
           ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/homepage');
+            },
+            child: Text('Go to homepage'),
+          ),
         ],
       ),
     );

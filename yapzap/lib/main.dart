@@ -39,6 +39,8 @@ import 'screens/forgot_password_screen_demo.dart';
 import 'screens/splash_page.dart';
 import 'screens/login_page.dart';
 import 'screens/register_page.dart';
+// import 'screens/chat_list.dart';
+import 'screens/home.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +65,7 @@ class MyApp extends StatelessWidget {
         // '/homepage': (context) => HomePageDemo(),
         // '/chatscreen': (context) => WebRTCChatApp(),
         '/forgotpassword': (context) => ForgotPasswordPage(),
+        '/homepage': (context) => const Home(userId: "charan"),
       },
     );
   }

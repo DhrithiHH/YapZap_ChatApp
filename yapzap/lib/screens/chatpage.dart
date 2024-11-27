@@ -39,7 +39,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // Initialize WebRTC and connect to the signaling server
   Future<void> _initializeWebRTC() async {
     webRTCLogic = WebRTCLogic(widget.userId, widget.peerId);
-    await webRTCLogic.connectSocket('  https://65e0-2409-4071-2484-de02-ec62-f2ff-6251-618d.ngrok-free.app');
+    await webRTCLogic.connectSocket('https://22d3-2409-4071-2484-de02-ec62-f2ff-6251-618d.ngrok-free.app ');
     await webRTCLogic.initializePeerConnection();
 
     // Listen for incoming messages through WebRTC data channel

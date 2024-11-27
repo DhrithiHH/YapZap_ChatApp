@@ -74,7 +74,46 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
- void _sendMessage() {
+ void _sendMessage() {void _sendMessage() {
+  final message = messageController.text.trim();
+  if (message.isEmpty) return;
+
+  // Generate a consistent chatId
+  List<String> users = [widget.userId, widget.peerId];
+  users.sort();
+  String chatId = '${users[0]}_${users[1]}';
+
+  // Save the message in Firestore
+  FirebaseFirestore.instance
+      .collection('messages')
+      .doc(chatId)
+      .collection('chatMessages')
+      .add({
+    'from': widget.userId,
+    'message': message,
+    'timestamp': Timestamp.now(),
+  });
+
+  // Update the UI immediately
+  setState(() {
+    messages.add({'from': widget.userId, 'message': message});
+    messageController.clear();
+  });
+
+  // Try to send the message through WebRTC data channel
+  try {
+    if (webRTCLogic.dataChannel != null &&
+        webRTCLogic.dataChannel.state == RTCDataChannelState.RTCDataChannelOpen) {
+      webRTCLogic.sendMessage(message);
+    } else {
+      debugPrint(
+          'Data channel is not initialized or not open. Message saved to Firestore only.');
+    }
+  } catch (e) {
+    debugPrint('Error sending message via WebRTC: $e');
+  }
+}
+
   final message = messageController.text.trim();
   if (message.isEmpty) return;
 

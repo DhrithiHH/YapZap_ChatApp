@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'chat_screen.dart';
+import 'package:yapzap/screens/chatpage.dart';
+// import 'chat_screen.dart';
 import 'connect.dart';
 
 class HomePageDemo extends StatefulWidget {
@@ -142,7 +143,7 @@ class _HomePageDemoState extends State<HomePageDemo> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => WebRTCChatApp(
+                                        builder: (context) => ChatScreen(
                                           userId: widget.userId,
                                           peerId: contactId,
                                         ),

@@ -31,17 +31,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    webRTCLogic.dispose
-    (); // Close WebRTC connections.
+    webRTCLogic.dispose(); // Close WebRTC connections.
     messageController.dispose();
     super.dispose();
   }
 
+  // Initialize WebRTC and connect to the signaling server
   Future<void> _initializeWebRTC() async {
     webRTCLogic = WebRTCLogic(widget.userId, widget.peerId);
     await webRTCLogic.connectSocket('https://server-ouzf.onrender.com');
     await webRTCLogic.initializePeerConnection();
 
+    // Listen for incoming messages through WebRTC data channel
     webRTCLogic.dataChannel.onMessage = (RTCDataChannelMessage message) {
       setState(() {
         messages.add({
@@ -52,105 +53,72 @@ class _ChatScreenState extends State<ChatScreen> {
     };
   }
 
+  // Fetch previous messages from Firestore
   Future<void> _fetchPreviousMessages() async {
     List<String> users = [widget.userId, widget.peerId];
-    users.sort(); // Ensures consistent chatId generation.
+    users.sort(); // Ensure consistent chatId generation.
     String chatId = '${users[0]}_${users[1]}';
 
-    final snapshot = await FirebaseFirestore.instance
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('messages')
+          .doc(chatId)
+          .collection('chatMessages')
+          .orderBy('timestamp')
+          .get();
+
+      setState(() {
+        messages.addAll(snapshot.docs.map((doc) {
+          return {
+            'from': doc['from'],
+            'message': doc['message'],
+          };
+        }).toList());
+      });
+    } catch (e) {
+      debugPrint('Error fetching previous messages: $e');
+    }
+  }
+
+  // Send a message via Firestore and WebRTC
+  void _sendMessage() {
+    final message = messageController.text.trim();
+    if (message.isEmpty) return;
+
+    // Generate a consistent chatId
+    List<String> users = [widget.userId, widget.peerId];
+    users.sort();
+    String chatId = '${users[0]}_${users[1]}';
+
+    // Save the message in Firestore
+    FirebaseFirestore.instance
         .collection('messages')
         .doc(chatId)
         .collection('chatMessages')
-        .orderBy('timestamp')
-        .get();
-
-    setState(() {
-      messages.addAll(snapshot.docs.map((doc) {
-        return {
-          'from': doc['from'],
-          'message': doc['message'],
-        };
-      }).toList());
+        .add({
+      'from': widget.userId,
+      'message': message,
+      'timestamp': Timestamp.now(),
     });
-  }
 
- void _sendMessage() {void _sendMessage() {
-  final message = messageController.text.trim();
-  if (message.isEmpty) return;
+    // Update the UI immediately
+    setState(() {
+      messages.add({'from': widget.userId, 'message': message});
+      messageController.clear();
+    });
 
-  // Generate a consistent chatId
-  List<String> users = [widget.userId, widget.peerId];
-  users.sort();
-  String chatId = '${users[0]}_${users[1]}';
-
-  // Save the message in Firestore
-  FirebaseFirestore.instance
-      .collection('messages')
-      .doc(chatId)
-      .collection('chatMessages')
-      .add({
-    'from': widget.userId,
-    'message': message,
-    'timestamp': Timestamp.now(),
-  });
-
-  // Update the UI immediately
-  setState(() {
-    messages.add({'from': widget.userId, 'message': message});
-    messageController.clear();
-  });
-
-  // Try to send the message through WebRTC data channel
-  try {
-    if (webRTCLogic.dataChannel != null &&
-        webRTCLogic.dataChannel.state == RTCDataChannelState.RTCDataChannelOpen) {
-      webRTCLogic.sendMessage(message);
-    } else {
-      debugPrint(
-          'Data channel is not initialized or not open. Message saved to Firestore only.');
+    // Try to send the message through WebRTC data channel
+    try {
+      if (webRTCLogic.dataChannel.state == RTCDataChannelState.RTCDataChannelOpen) {
+        webRTCLogic.sendMessage(message);
+      } else {
+        debugPrint(
+            'Data channel is not initialized or not open. Message saved to Firestore only.');
+      }
+    } catch (e) {
+      debugPrint('Error sending message via WebRTC: $e');
     }
-  } catch (e) {
-    debugPrint('Error sending message via WebRTC: $e');
   }
-}
-
-  final message = messageController.text.trim();
-  if (message.isEmpty) return;
-
-  // Generate a consistent chatId
-  List<String> users = [widget.userId, widget.peerId];
-  users.sort();
-  String chatId = '${users[0]}_${users[1]}';
-
-  // Save the message in Firestore
-  FirebaseFirestore.instance
-      .collection('messages')
-      .doc(chatId)
-      .collection('chatMessages')
-      .add({
-    'from': widget.userId,
-    'message': message,
-    'timestamp': Timestamp.now(),
-  });
-
-  // Update the UI immediately
-  setState(() {
-    messages.add({'from': widget.userId, 'message': message});
-    messageController.clear();
-  });
-
-  // Try to send the message through WebRTC data channel
-  try {
-    if (webRTCLogic.dataChannel.state == RTCDataChannelState.RTCDataChannelOpen) {
-      webRTCLogic.sendMessage(message);
-    } else {
-      debugPrint('Data channel is not open. Message saved to Firestore.');
-    }
-  } catch (e) {
-    debugPrint('Error sending message via WebRTC: $e');
-  }
-}
-
 
   @override
   Widget build(BuildContext context) {

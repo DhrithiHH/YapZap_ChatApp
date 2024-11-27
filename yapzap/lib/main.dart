@@ -29,13 +29,13 @@
 // }
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:yapzap/screens/connect.dart';
+// import 'package:yapzap/screens/connect.dart';
 import '../screens/navigation_screen.dart';
 import 'screens/login_screen_demo.dart';
 import 'screens/register_screen_demo.dart';
-import 'screens/home_page_demo.dart';
+// import 'screens/home_page_demo.dart';
 //import 'screens/chat_screen.dart';
-import 'screens/forgot_password_screen_demo.dart';
+// import 'screens/forgot_password_screen_demo.dart';
 import 'screens/splash_page.dart';
 import 'screens/login_page.dart';
 import 'screens/register_page.dart';

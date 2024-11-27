@@ -210,7 +210,7 @@ class _LoginScreenDemoState extends State<LoginPage>
                     const SizedBox(height: 20),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/register');
+                        Navigator.pushNamed(context, '/registerf');
                       },
                       child: const Text(
                         'Don\'t have an account? Register here',

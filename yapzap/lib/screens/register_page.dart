@@ -150,7 +150,7 @@ class _RegisterPageState extends State<RegisterPage>
                     const SizedBox(height: 20),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/login');
+                        Navigator.pushNamed(context, '/loginf');
                       },
                       child: const Text(
                         'Already have an account? Login here',

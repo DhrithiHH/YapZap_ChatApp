@@ -22,7 +22,7 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF7ED321), // Green color
+      backgroundColor: const Color(0xFFFFB0FE), // Correct pink color
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

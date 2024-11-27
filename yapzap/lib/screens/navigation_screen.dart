@@ -46,17 +46,23 @@ class NavigationTestScreen extends StatelessWidget {
             },
             child: Text('Go to Chat Screen'),
           ),
-          // ElevatedButton(
-          //   onPressed: () {
-          //     Navigator.pushNamed(context, '/forgotpassword');
-          //   },
-          //   child: Text('Go to Forgot Password Screen'),
-          // ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/forgotpassword');
+            },
+            child: Text('Go to Forgot Password Screen'),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pushNamed(context, '/homepage');
             },
             child: Text('Go to homepage'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/userprofilepage');
+            },
+            child: Text('Go to UserProfilePage'),
           ),
         ],
       ),

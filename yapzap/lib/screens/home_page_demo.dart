@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:yapzap/screens/chatpage.dart';
-// import 'chat_screen.dart';
 import 'connect.dart';
 
 class HomePageDemo extends StatefulWidget {
@@ -13,11 +13,89 @@ class HomePageDemo extends StatefulWidget {
   _HomePageDemoState createState() => _HomePageDemoState();
 }
 
-class _HomePageDemoState extends State<HomePageDemo> {
+class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _searchQuery = '';
+  late IO.Socket socket;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Observe app lifecycle for managing socket connection
+    WidgetsBinding.instance.addObserver(this);
+
+    // Connect to the socket server
+    _connectSocket();
+  }
+
+  @override
+  void dispose() {
+    // Cleanup socket connection
+    _disconnectSocket();
+
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Manage socket connection based on app lifecycle
+    if (state == AppLifecycleState.resumed) {
+      // Reconnect socket when app is active
+      if (!socket.connected) {
+        _connectSocket();
+      }
+    } else if (state == AppLifecycleState.detached) {
+      // Disconnect socket when app is terminated
+      _disconnectSocket();
+    }
+  }
+
+  void _connectSocket() {
+    // Initialize and connect the socket
+    socket = IO.io(
+      'http://server-ouzf.onrender.com', // Replace with your server URL
+      IO.OptionBuilder()
+          .setTransports(['websocket'])
+          .setQuery({'userId': widget.userId}) // Send userId to the server
+          .build(),
+    );
+
+    // Listen for connection
+    socket.on('connect', (_) {
+      print('Connected to socket: ${socket.id}');
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', (_) {
+      print('Disconnected from socket');
+    });
+
+    // Listen for custom events (e.g., message, notification)
+    socket.on('new-message', (data) {
+      print('New message received: $data');
+    });
+
+    socket.on('user-joined', (data) {
+      print('User joined: $data');
+    });
+
+    // Handle any errors
+    socket.on('error', (error) {
+      print('Socket error: $error');
+    });
+  }
+
+  void _disconnectSocket() {
+    // Disconnect socket
+    if (socket.connected) {
+      socket.disconnect();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -146,6 +224,7 @@ class _HomePageDemoState extends State<HomePageDemo> {
                                         builder: (context) => ChatScreen(
                                           userId: widget.userId,
                                           peerId: contactId,
+                                          socket: socket,
                                         ),
                                       ),
                                     );

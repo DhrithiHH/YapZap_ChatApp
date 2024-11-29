@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'webRtc.dart'; // Assuming your WebRTCLogic is in this file.
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class ChatScreen extends StatefulWidget {
   final String userId;
   final String peerId;
+  final IO.Socket socket; // Accept socket as a parameter
 
   const ChatScreen({
     Key? key,
     required this.userId,
     required this.peerId,
+    required this.socket,
   }) : super(key: key);
 
   @override
@@ -38,9 +41,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // Initialize WebRTC and connect to the signaling server
   Future<void> _initializeWebRTC() async {
-    webRTCLogic = WebRTCLogic(widget.userId, widget.peerId);
-    await webRTCLogic.connectSocket('https://22d3-2409-4071-2484-de02-ec62-f2ff-6251-618d.ngrok-free.app ');
-    await webRTCLogic.initializePeerConnection();
+    webRTCLogic = WebRTCLogic(widget.userId, widget.peerId, widget.socket);
+    // await webRTCLogic.initWebRTC();
+    await webRTCLogic.initMedia();
 
     // Listen for incoming messages through WebRTC data channel
     webRTCLogic.dataChannel.onMessage = (RTCDataChannelMessage message) {
@@ -120,6 +123,16 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // Start Audio Call
+  void _startAudioCall() {
+    webRTCLogic.startCall();
+  }
+
+  // Start Video Call
+  void _startVideoCall() {
+    webRTCLogic.startCall();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,6 +146,16 @@ class _ChatScreenState extends State<ChatScreen> {
             Text('Chat with ${widget.peerId}'),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.phone),
+            onPressed: _startAudioCall, // Audio call button
+          ),
+          IconButton(
+            icon: Icon(Icons.videocam),
+            onPressed: _startVideoCall, // Video call button
+          ),
+        ],
       ),
       body: Column(
         children: [

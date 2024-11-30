@@ -12,7 +12,7 @@ class WebRTCLogic {
   final IO.Socket socket;
 
   WebRTCLogic(this.userId, this.peerId, this.socket) {
-    _initializeWebRTC();
+    _joinSignaling(); // Join signaling server first
   }
 
   final Map<String, dynamic> configuration = {
@@ -30,15 +30,52 @@ class WebRTCLogic {
     });
   }
 
-  // Initialize WebRTC
+  // Initialize WebRTC (moved from _initializeWebRTC to _joinSignaling)
+  Future<void> _joinSignaling() async {
+    try {
+      // Emit 'join-signaling' event with userId
+      socket.emit('join-signaling', {'userId': userId});
+      
+      // Setup signaling listeners
+      socket.on('user-id', (data) {
+        print("Successfully joined signaling server with userId: ${data['userId']}");
+        _initializeWebRTC();
+      });
+
+      socket.on('error', (error) {
+        print("Error in signaling: $error");
+      });
+
+    } catch (e) {
+      _sendErrorToServer('Error joining signaling: $e');
+    }
+  }
+
+  // Initialize WebRTC and peer connection
   Future<void> _initializeWebRTC() async {
     try {
-      socket.on('offer', _handleOffer);
-      socket.on('answer', _handleAnswer);
-      socket.on('ice-candidate', _handleIceCandidate);
+      await _setupSocketListeners();
+      _peerConnection = await _createPeerConnection();
 
-      _peerConnection = await createPeerConnection(configuration, {});
-      _peerConnection.onIceCandidate = (RTCIceCandidate candidate) {
+      // Setup data channel for sending and receiving messages
+      _dataChannel = await _createDataChannel();
+      _setupDataChannelListeners();
+
+      print('WebRTC initialized successfully');
+    } catch (e) {
+      _sendErrorToServer('Error initializing WebRTC: $e');
+    }
+  }
+
+  // Create and configure peer connection
+  Future<RTCPeerConnection> _createPeerConnection() async {
+    try {
+      final connection = await createPeerConnection(configuration, {});
+      if (connection == null) {
+        throw Exception('Failed to create RTCPeerConnection');
+      }
+
+      connection.onIceCandidate = (RTCIceCandidate candidate) {
         if (candidate != null) {
           socket.emit('ice-candidate', {
             'candidate': candidate.candidate,
@@ -49,15 +86,47 @@ class WebRTCLogic {
         }
       };
 
-      _peerConnection.onDataChannel = (RTCDataChannel channel) {
+      connection.onDataChannel = (RTCDataChannel channel) {
         _dataChannel = channel;
-        _dataChannel.onMessage = (RTCDataChannelMessage message) {
-          print('Received message: ${message.text}');
-        };
+        _setupDataChannelListeners();
       };
+
+      return connection;
     } catch (e) {
-      _sendErrorToServer('Error initializing WebRTC: $e');
+      _sendErrorToServer('Error creating peer connection: $e');
+      rethrow;
     }
+  }
+
+  // Create a data channel for messaging
+  Future<RTCDataChannel> _createDataChannel() async {
+    try {
+      RTCDataChannelInit dataChannelInit = RTCDataChannelInit();
+      return _peerConnection.createDataChannel('chat', dataChannelInit);
+    } catch (e) {
+      _sendErrorToServer('Error creating data channel: $e');
+      rethrow;
+    }
+  }
+
+  // Setup listeners for data channel
+  void _setupDataChannelListeners() {
+  _dataChannel.onMessage = (RTCDataChannelMessage message) {
+    print('Received message: ${message.text}');
+  };
+
+  // Fix the listener to match the expected function signature
+  _dataChannel.onDataChannelState = (RTCDataChannelState state) {
+    print('Data channel state: $state');
+  };
+}
+
+
+  // Setup listeners for socket events
+  Future<void> _setupSocketListeners() async {
+    socket.on('offer', _handleOffer);
+    socket.on('answer', _handleAnswer);
+    socket.on('ice-candidate', _handleIceCandidate);
   }
 
   // Initialize local media (camera/mic)
@@ -75,10 +144,10 @@ class WebRTCLogic {
     }
   }
 
-  // Create and send an offer
+  // Start call and create an offer
   Future<void> startCall() async {
     try {
-      await initMedia();
+      await initMedia(); // Ensure media is initialized before creating offer
       RTCSessionDescription offer = await _peerConnection.createOffer();
       await _peerConnection.setLocalDescription(offer);
 
@@ -95,7 +164,7 @@ class WebRTCLogic {
   }
 
   // Handle incoming offer
-  void _handleOffer(data) async {
+  Future<void> _handleOffer(data) async {
     try {
       RTCSessionDescription offer = RTCSessionDescription(
         data['offer']['sdp'],
@@ -119,7 +188,7 @@ class WebRTCLogic {
   }
 
   // Handle incoming answer
-  void _handleAnswer(data) async {
+  Future<void> _handleAnswer(data) async {
     try {
       RTCSessionDescription answer = RTCSessionDescription(
         data['answer']['sdp'],
@@ -132,7 +201,7 @@ class WebRTCLogic {
   }
 
   // Handle ICE candidates
-  void _handleIceCandidate(data) async {
+  Future<void> _handleIceCandidate(data) async {
     try {
       RTCIceCandidate candidate = RTCIceCandidate(
         data['candidate'],
@@ -154,7 +223,7 @@ class WebRTCLogic {
     }
   }
 
-  // End the call
+  // End the call and dispose of resources
   void endCall() {
     _peerConnection.close();
     _peerConnection.dispose();

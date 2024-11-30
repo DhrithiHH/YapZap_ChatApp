@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:yapzap/models/friend_model.dart';
 
 class NavigationTestScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final friend = FriendModel(
+      profilePic: "https://via.placeholder.com/150",
+      contactName: "John Doe",
+      userId: "12345",
+    );
     return Scaffold(
       appBar: AppBar(
         title: Text('Navigation Test Screen'),
@@ -57,6 +63,12 @@ class NavigationTestScreen extends StatelessWidget {
               Navigator.pushNamed(context, '/homepage');
             },
             child: Text('Go to homepage'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/userprofilepage');
+            },
+            child: Text('Go to UserProfilePage'),
           ),
           ElevatedButton(
             onPressed: () {

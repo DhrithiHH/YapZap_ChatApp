@@ -8,6 +8,9 @@ class HomePageDemo extends StatefulWidget {
   final String userId; // Accepts userId as a parameter
 
   const HomePageDemo({Key? key, required this.userId}) : super(key: key);
+  
+  // get socket => null;
+  
 
   @override
   _HomePageDemoState createState() => _HomePageDemoState();
@@ -19,6 +22,7 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
 
   String _searchQuery = '';
   late IO.Socket socket;
+  // get socket1 => socket;
 
   @override
   void initState() {
@@ -247,7 +251,7 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ConnectPage(userId: widget.userId),
+                      builder: (context) => ConnectPage(userId: widget.userId,socket:socket),
                     ),
                   );
                 },

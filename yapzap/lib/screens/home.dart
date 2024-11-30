@@ -251,12 +251,12 @@ class _HomeState extends State<Home> {
             child: FloatingActionButton(
               backgroundColor: const Color(0xFF00A86B), // Green
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ConnectPage(userId: widget.userId),
-                  ),
-                );
+                // Navigator.push(
+                //   context,
+                //   MaterialPageRoute(
+                //     // builder: (context) => ConnectPage(userId: widget.userId),
+                //   ),
+                // );
               },
               child: const Icon(Icons.add, color: Colors.white), // White icon
             ),

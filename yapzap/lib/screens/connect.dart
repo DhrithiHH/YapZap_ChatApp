@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'chat_screen.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:yapzap/screens/chatpage.dart';
+// import 'chat_screen.dart';
 
 class ConnectPage extends StatefulWidget {
   final String userId;
+  final IO.Socket socket;
 
-  const ConnectPage({Key? key, required this.userId}) : super(key: key);
+  const ConnectPage({
+    Key? key,
+    required this.userId,
+    required this.socket,
+  }) : super(key: key);
 
   @override
   _ConnectPageState createState() => _ConnectPageState();
@@ -61,12 +68,15 @@ class _ConnectPageState extends State<ConnectPage> {
   Future<void> _addContact(String userId) async {
     try {
       // Reference to the current user's document
-      DocumentReference userDoc =
-          FirebaseFirestore.instance.collection('users').doc(widget.userId);
-
+      DocumentReference userDoc = FirebaseFirestore.instance.collection('users').doc(widget.userId);
+      DocumentReference peerDoc = FirebaseFirestore.instance.collection('users').doc(userId);
+ 
       // Update the contacts array
       await userDoc.update({
         'contacts': FieldValue.arrayUnion([userId]),
+      });
+      await peerDoc.update({
+        'contacts': FieldValue.arrayUnion([widget.userId]),
       });
 
       print('Contact added successfully!');
@@ -113,9 +123,10 @@ void _openChatScreen(String userId, String username) async {
   Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (context) => WebRTCChatApp(
+      builder: (context) => ChatScreen(
         userId: widget.userId,
         peerId: userId,
+        socket: widget.socket,
         // chatId: chatId, // Pass the chatId to the chat screen
       ),
     ),

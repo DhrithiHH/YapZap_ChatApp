@@ -6,124 +6,106 @@ class WebRTCLogic {
   late RTCDataChannel _dataChannel;
   MediaStream? _localStream;
   MediaStream? _remoteStream;
+
   final String userId;
   final String peerId;
+  final IO.Socket socket;
 
-  late IO.Socket socket; // Signaling server socket
-
-  // Constructor now initializes WebRTC directly
   WebRTCLogic(this.userId, this.peerId, this.socket) {
-    initWebRTC(); // Initialize WebRTC when the class is instantiated
+    _initializeWebRTC();
   }
 
-  // WebRTC configuration for ICE servers
   final Map<String, dynamic> configuration = {
     'iceServers': [
-      {
-        'urls': 'stun:stun.l.google.com:19302', // Google public STUN server
-      },
+      {'urls': 'stun:stun.l.google.com:19302'},
     ],
   };
 
-  // Initialize WebRTC peer connection and data channel
-  Future<void> initWebRTC() async {
+  // Send error messages to signaling server
+  void _sendErrorToServer(String message) {
+    socket.emit('error', {
+      'userId': userId,
+      'peerId': peerId,
+      'message': message,
+    });
+  }
+
+  // Initialize WebRTC
+  Future<void> _initializeWebRTC() async {
     try {
-      // Ensure that socket connection is ready
-      if (socket.connected) {
-        print('Socket connected');
-      } else {
-        print('Socket not connected');
-        return;
-      }
+      socket.on('offer', _handleOffer);
+      socket.on('answer', _handleAnswer);
+      socket.on('ice-candidate', _handleIceCandidate);
 
-      // Handle incoming signaling messages
-      socket.on('offer', (data) => handleOffer(data));
-      socket.on('answer', (data) => handleAnswer(data));
-      socket.on('ice-candidate', (data) => handleIceCandidate(data));
-
-      // Create peer connection
       _peerConnection = await createPeerConnection(configuration, {});
-
-      // On incoming data channel messages
-      _peerConnection.onDataChannel = (RTCDataChannel channel) {
-        channel.onMessage = (RTCDataChannelMessage message) {
-          print('Received message: ${message.text}');
-        };
-        _dataChannel = channel;
+      _peerConnection.onIceCandidate = (RTCIceCandidate candidate) {
+        if (candidate != null) {
+          socket.emit('ice-candidate', {
+            'candidate': candidate.candidate,
+            'sdpMid': candidate.sdpMid,
+            'sdpMLineIndex': candidate.sdpMLineIndex,
+            'to': peerId,
+          });
+        }
       };
 
-      // Create a data channel for sending messages
-      RTCDataChannelInit dataChannelInit = RTCDataChannelInit();
-      _dataChannel = await _peerConnection.createDataChannel('chat', dataChannelInit);
-
-      // Send a test message once the data channel is created
-      _dataChannel.send(RTCDataChannelMessage('Hello, peer!'));
+      _peerConnection.onDataChannel = (RTCDataChannel channel) {
+        _dataChannel = channel;
+        _dataChannel.onMessage = (RTCDataChannelMessage message) {
+          print('Received message: ${message.text}');
+        };
+      };
     } catch (e) {
-      print('Error initializing WebRTC: $e');
+      _sendErrorToServer('Error initializing WebRTC: $e');
     }
   }
- RTCDataChannel get dataChannel => _dataChannel;
-  // Initialize media stream (audio/video)
+
+  // Initialize local media (camera/mic)
   Future<void> initMedia() async {
     try {
-      final stream = await navigator.mediaDevices.getUserMedia({
+      _localStream = await navigator.mediaDevices.getUserMedia({
         'audio': true,
         'video': {'facingMode': 'user'},
       });
-      _localStream = stream;
-      // Add local media stream to the peer connection
-      _localStream?.getTracks().forEach((track) {
+      _localStream!.getTracks().forEach((track) {
         _peerConnection.addTrack(track, _localStream!);
       });
     } catch (e) {
-      print('Error initializing media stream: $e');
+      _sendErrorToServer('Error initializing media: $e');
     }
   }
 
-  // Send message through the data channel
-  void sendMessage(String message) {
-    if (_dataChannel.state == RTCDataChannelState.RTCDataChannelOpen) {
-      _dataChannel.send(RTCDataChannelMessage(message));
-      print('Message sent: $message');
-    } else {
-      print('Data channel is not open yet.');
-    }
-  }
-
-  // Create and send an offer to start a call
+  // Create and send an offer
   Future<void> startCall() async {
     try {
-      if (_localStream == null) {
-        await initMedia();
-      }
-
-      // Create an offer
-      final offer = await _peerConnection.createOffer();
+      await initMedia();
+      RTCSessionDescription offer = await _peerConnection.createOffer();
       await _peerConnection.setLocalDescription(offer);
 
-      // Send the offer to the peer via the existing signaling server socket
       socket.emit('offer', {
         'offer': {
           'sdp': offer.sdp,
           'type': offer.type,
         },
-        'to': peerId,  // Send offer to the peer with peerId
+        'to': peerId,
       });
     } catch (e) {
-      print('Error starting call: $e');
+      _sendErrorToServer('Error starting call: $e');
     }
   }
 
   // Handle incoming offer
-  Future<void> handleOffer(Map<String, dynamic> data) async {
+  void _handleOffer(data) async {
     try {
-      final offer = data['offer'];
-      await _peerConnection.setRemoteDescription(RTCSessionDescription(offer['sdp'], offer['type']));
+      RTCSessionDescription offer = RTCSessionDescription(
+        data['offer']['sdp'],
+        data['offer']['type'],
+      );
+      await _peerConnection.setRemoteDescription(offer);
 
-      final answer = await _peerConnection.createAnswer();
+      RTCSessionDescription answer = await _peerConnection.createAnswer();
       await _peerConnection.setLocalDescription(answer);
 
-      // Send the answer back to the peer via signaling server
       socket.emit('answer', {
         'answer': {
           'sdp': answer.sdp,
@@ -132,48 +114,48 @@ class WebRTCLogic {
         'to': data['from'],
       });
     } catch (e) {
-      print('Error handling offer: $e');
+      _sendErrorToServer('Error handling offer: $e');
     }
   }
 
   // Handle incoming answer
-  Future<void> handleAnswer(Map<String, dynamic> data) async {
+  void _handleAnswer(data) async {
     try {
-      final answer = data['answer'];
-      await _peerConnection.setRemoteDescription(RTCSessionDescription(answer['sdp'], answer['type']));
+      RTCSessionDescription answer = RTCSessionDescription(
+        data['answer']['sdp'],
+        data['answer']['type'],
+      );
+      await _peerConnection.setRemoteDescription(answer);
     } catch (e) {
-      print('Error handling answer: $e');
+      _sendErrorToServer('Error handling answer: $e');
     }
   }
 
-  // Handle incoming ICE candidates
-  Future<void> handleIceCandidate(Map<String, dynamic> data) async {
+  // Handle ICE candidates
+  void _handleIceCandidate(data) async {
     try {
-      final candidate = RTCIceCandidate(
+      RTCIceCandidate candidate = RTCIceCandidate(
         data['candidate'],
         data['sdpMid'],
         data['sdpMLineIndex'],
       );
       await _peerConnection.addCandidate(candidate);
     } catch (e) {
-      print('Error handling ICE candidate: $e');
+      _sendErrorToServer('Error handling ICE candidate: $e');
     }
   }
 
-  // End the call and clean up resources
+  // Send a message through the data channel
+  void sendMessage(String message) {
+    if (_dataChannel.state == RTCDataChannelState.RTCDataChannelOpen) {
+      _dataChannel.send(RTCDataChannelMessage(message));
+    } else {
+      _sendErrorToServer('Data channel is not open.');
+    }
+  }
+
+  // End the call
   void endCall() {
-    try {
-      _peerConnection.close();
-      _peerConnection.dispose();
-      _localStream?.dispose();
-      _remoteStream?.dispose();
-    } catch (e) {
-      print('Error ending call: $e');
-    }
-  }
-
-  // Dispose of resources when done
-  void dispose() {
     _peerConnection.close();
     _peerConnection.dispose();
     _localStream?.dispose();

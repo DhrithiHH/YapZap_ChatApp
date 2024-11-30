@@ -43,6 +43,8 @@ import 'screens/login_page.dart';
 import 'screens/register_page.dart';
 // import 'screens/chat_list.dart';
 import 'screens/home.dart';
+import 'screens/friend_details_page.dart';
+import 'models/friend_model.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

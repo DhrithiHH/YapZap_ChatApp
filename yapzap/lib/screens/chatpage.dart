@@ -42,7 +42,6 @@ class _ChatScreenState extends State<ChatScreen> {
   // Initialize WebRTC and connect to the signaling server
   Future<void> _initializeWebRTC() async {
     webRTCLogic = WebRTCLogic(widget.userId, widget.peerId, widget.socket);
-    // await webRTCLogic.initWebRTC();
     await webRTCLogic.initMedia();
 
     // Listen for incoming messages through WebRTC data channel
@@ -112,7 +111,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Try to send the message through WebRTC data channel
     try {
-      if (webRTCLogic.dataChannel.state == RTCDataChannelState.RTCDataChannelOpen) {
+      if (webRTCLogic.dataChannel.state ==
+          RTCDataChannelState.RTCDataChannelOpen) {
         webRTCLogic.sendMessage(message);
       } else {
         debugPrint(
@@ -143,7 +143,13 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Text(widget.peerId.substring(0, 2).toUpperCase()),
             ),
             const SizedBox(width: 10),
-            Text('Chat with ${widget.peerId}'),
+            Expanded(
+              // Fix for RenderFlex overflow
+              child: Text(
+                'Chat with ${widget.peerId}',
+                overflow: TextOverflow.ellipsis, // Ensures text truncation
+              ),
+            ),
           ],
         ),
         actions: [
@@ -165,10 +171,12 @@ class _ChatScreenState extends State<ChatScreen> {
               itemBuilder: (context, index) {
                 final isMine = messages[index]['from'] == widget.userId;
                 return Align(
-                  alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      isMine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     padding: const EdgeInsets.all(10),
-                    margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
                     decoration: BoxDecoration(
                       color: isMine ? Colors.blueAccent : Colors.grey[300],
                       borderRadius: BorderRadius.circular(8),
@@ -189,6 +197,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               children: [
                 Expanded(
+                  // Fix for RenderFlex overflow
                   child: TextField(
                     controller: messageController,
                     decoration: const InputDecoration(

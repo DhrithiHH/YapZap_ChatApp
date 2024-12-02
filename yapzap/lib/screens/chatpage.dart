@@ -21,12 +21,11 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final List<Map<String, dynamic>> _messages = [];
-  bool _isSending = false; // Tracks sending state
+  bool _isSending = false;
 
   @override
   void initState() {
     super.initState();
-
     // Listen for incoming messages via socket
     widget.socket.on('message', _onMessageReceived);
 
@@ -41,7 +40,6 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  /// Fetch previous messages from Firestore
   Future<void> _fetchPreviousMessages() async {
     List<String> users = [widget.userId, widget.peerId];
     users.sort(); // Ensure consistent chatId generation
@@ -52,42 +50,37 @@ class _ChatScreenState extends State<ChatScreen> {
           .collection('messages')
           .doc(chatId)
           .collection('chatMessages')
-          .orderBy('timestamp', descending: true)
-          .limit(50)
+          .orderBy('timestamp')
           .get();
 
       setState(() {
-        _messages.insertAll(
-          0,
-          snapshot.docs.map((doc) {
-            return {
-              'from': doc['from'],
-              'message': doc['message'],
-              'timestamp': doc['timestamp']?.toDate() ?? DateTime.now(),
-            };
-          }).toList(),
-        );
+        _messages.addAll(snapshot.docs.map((doc) {
+          return {
+            'from': doc['from'],
+            'message': doc['message'],
+          };
+        }).toList());
       });
     } catch (e) {
       debugPrint('Error fetching previous messages: $e');
-      _showError('Failed to fetch messages. Please try again.');
     }
   }
 
-  /// Handle incoming messages via socket
   void _onMessageReceived(dynamic data) {
-    setState(() {
-      _messages.insert(0, {
-        'from': data['from'],
-        'message': data['message'],
-        'timestamp': DateTime.now(),
+    debugPrint('Message received: $data');
+    if (data['from'] != widget.userId) {
+      setState(() {
+        _messages.insert(0, {
+          'from': data['from'],
+          'message': data['message'],
+        });
       });
-    });
+    }
   }
 
-  /// Send a message via socket and store it in Firestore
   Future<void> _sendMessage(String message) async {
-    if (_isSending) return; // Prevent multiple clicks
+    if (message.trim().isEmpty) return;
+
     setState(() => _isSending = true);
 
     List<String> users = [widget.userId, widget.peerId];
@@ -108,18 +101,22 @@ class _ChatScreenState extends State<ChatScreen> {
           .collection('chatMessages')
           .add(messageObject);
 
+      debugPrint('Message stored in Firestore: $messageObject');
+
       // Send the message via socket
       widget.socket.emit('message', {
-        'from': widget.userId,
         'message': message,
         'to': widget.peerId,
+        'from': widget.userId,
       });
 
+      debugPrint('Message emitted: $messageObject');
+
+      // Update UI
       setState(() {
         _messages.insert(0, {
           'from': widget.userId,
           'message': message,
-          'timestamp': DateTime.now(),
         });
         _messageController.clear();
       });
@@ -131,59 +128,45 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// Show error message in a snackbar
-  void _showError(String error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(error)),
-    );
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: Colors.red,
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Chat with ${widget.peerId}'),
+        title: const Text('Chat Page'),
       ),
       body: Column(
         children: [
           // Message Display Area
           Expanded(
             child: ListView.builder(
-              reverse: true, // Show the newest messages at the bottom
+              reverse: true,
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                final isOwnMessage = message['from'] == widget.userId;
-
                 return Align(
-                  alignment:
-                      isOwnMessage ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Card(
-                    color: isOwnMessage
-                        ? Colors.blue[100]
-                        : Colors.grey[300],
+                  alignment: message['from'] == widget.userId
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Container(
                     margin: const EdgeInsets.symmetric(
-                      vertical: 5.0,
-                      horizontal: 10.0,
+                        vertical: 5, horizontal: 10),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: message['from'] == widget.userId
+                          ? Colors.blue[200]
+                          : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(10.0),
-                      child: Column(
-                        crossAxisAlignment: isOwnMessage
-                            ? CrossAxisAlignment.end
-                            : CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            message['message'],
-                            style: const TextStyle(fontSize: 16.0),
-                          ),
-                          const SizedBox(height: 5.0),
-                          Text(
-                            _formatTimestamp(message['timestamp']),
-                            style: const TextStyle(fontSize: 12.0, color: Colors.grey),
-                          ),
-                        ],
-                      ),
+                    child: Text(
+                      message['message'],
+                      style: const TextStyle(fontSize: 16),
                     ),
                   ),
                 );
@@ -200,18 +183,25 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: _messageController,
                     decoration: const InputDecoration(
-                      hintText: 'Type a message...',
+                      hintText: 'Type a message',
                       border: OutlineInputBorder(),
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 IconButton(
-                  icon: _isSending
-                      ? const CircularProgressIndicator()
-                      : const Icon(Icons.send),
-                  onPressed: _messageController.text.trim().isEmpty
+                  icon: Icon(
+                    _isSending ? Icons.hourglass_empty : Icons.send,
+                    color: _isSending ? Colors.grey : Colors.blue,
+                  ),
+                  onPressed: _isSending
                       ? null
-                      : () => _sendMessage(_messageController.text.trim()),
+                      : () {
+                          String message = _messageController.text;
+                          if (message.isNotEmpty) {
+                            _sendMessage(message);
+                          }
+                        },
                 ),
               ],
             ),
@@ -219,14 +209,5 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
-  }
-
-  /// Format a timestamp into a readable string
-  String _formatTimestamp(DateTime timestamp) {
-    final now = DateTime.now();
-    if (now.difference(timestamp).inDays < 1) {
-      return '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
-    }
-    return '${timestamp.month}/${timestamp.day}/${timestamp.year}';
   }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:yapzap/screens/webRtc.dart';
 
 class ChatScreen extends StatefulWidget {
   final String userId;
@@ -20,7 +19,6 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  late WebRTCLogic _webRTCLogic;
   TextEditingController _messageController = TextEditingController();
   List<Map<String, dynamic>> messages = [];
 
@@ -28,17 +26,17 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
 
-    // Initialize WebRTC logic with userId, peerId, and socket
-    _webRTCLogic = WebRTCLogic(widget.userId, widget.peerId, widget.socket);
+    // Listen for incoming messages via socket
+    widget.socket.on('message', _onMessageReceived);
 
-    // Fetch previous messages
+    // Fetch previous messages from Firestore
     _fetchPreviousMessages();
   }
 
   @override
   void dispose() {
-    // Dispose WebRTC resources when leaving the screen
-    _webRTCLogic.endCall();
+    // Remove the listener for chat messages
+    widget.socket.off('message', _onMessageReceived);
     super.dispose();
   }
 
@@ -69,18 +67,43 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // Send message to Firestore
+  // Handle incoming messages via socket
+  void _onMessageReceived(dynamic data) {
+    debugPrint('Message received: $data');
+
+    setState(() {
+      messages.add({
+        'from': data['from'],
+        'message': data['message'],
+      });
+    });
+  }
+
+  // Send a message via socket and store it in Firestore
   Future<void> _sendMessage(String message) async {
     List<String> users = [widget.userId, widget.peerId];
     users.sort(); // Ensure consistent chatId generation.
     String chatId = '${users[0]}_${users[1]}';
 
+    // Message object
+    final messageObject = {
+      'from': widget.userId,
+      'message': message,
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+
     try {
-      await FirebaseFirestore.instance.collection('messages').doc(chatId).collection('chatMessages').add({
-        'from': widget.userId,
-        'message': message,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      // Store the message in Firestore
+      await FirebaseFirestore.instance
+          .collection('messages')
+          .doc(chatId)
+          .collection('chatMessages')
+          .add(messageObject);
+
+      // Send the message via socket
+      widget.socket.emit('message', {messageObject, widget.peerId});
+
+      debugPrint('Message sent: $messageObject');
 
       setState(() {
         messages.add({
@@ -99,20 +122,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chat Page'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.call), // Audio Call Icon
-            onPressed: () {
-              _webRTCLogic.startCall(); // Start the audio call
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.videocam), // Video Call Icon
-            onPressed: () {
-              _webRTCLogic.startCall(); // Start the video call
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -148,8 +157,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   onPressed: () {
                     String message = _messageController.text;
                     if (message.isNotEmpty) {
-                      _sendMessage(message); // Send the message to Firestore
-                      _webRTCLogic.sendMessage(message); // Send message over WebRTC
+                      _sendMessage(message); // Send the message
                     }
                   },
                 ),

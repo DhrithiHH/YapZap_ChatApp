@@ -55,8 +55,7 @@ class WebRTCLogic {
   Future<void> _initializeWebRTC() async {
     try {
       await _setupSocketListeners();
-      _peerConnection = await _createPeerConnection();
-
+      await _createPeerConnection(); // Ensure peer connection is created here
       // Setup data channel for sending and receiving messages
       _dataChannel = await _createDataChannel();
       _setupDataChannelListeners();
@@ -68,14 +67,17 @@ class WebRTCLogic {
   }
 
   // Create and configure peer connection
-  Future<RTCPeerConnection> _createPeerConnection() async {
+  Future<void> _createPeerConnection() async {
     try {
       final connection = await createPeerConnection(configuration, {});
       if (connection == null) {
         throw Exception('Failed to create RTCPeerConnection');
+        print('Failed to create RTCPeerConnection');
       }
+      
+      _peerConnection = connection; // Now _peerConnection is initialized
 
-      connection.onIceCandidate = (RTCIceCandidate candidate) {
+      _peerConnection.onIceCandidate = (RTCIceCandidate candidate) {
         if (candidate != null) {
           socket.emit('ice-candidate', {
             'candidate': candidate.candidate,
@@ -86,12 +88,11 @@ class WebRTCLogic {
         }
       };
 
-      connection.onDataChannel = (RTCDataChannel channel) {
+      _peerConnection.onDataChannel = (RTCDataChannel channel) {
         _dataChannel = channel;
+        print("connection initialized");
         _setupDataChannelListeners();
       };
-
-      return connection;
     } catch (e) {
       _sendErrorToServer('Error creating peer connection: $e');
       rethrow;
@@ -111,16 +112,14 @@ class WebRTCLogic {
 
   // Setup listeners for data channel
   void _setupDataChannelListeners() {
-  _dataChannel.onMessage = (RTCDataChannelMessage message) {
-    print('Received message: ${message.text}');
-  };
+    _dataChannel.onMessage = (RTCDataChannelMessage message) {
+      print('Received message: ${message.text}');
+    };
 
-  // Fix the listener to match the expected function signature
-  _dataChannel.onDataChannelState = (RTCDataChannelState state) {
-    print('Data channel state: $state');
-  };
-}
-
+    _dataChannel.onDataChannelState = (RTCDataChannelState state) {
+      print('Data channel state: $state');
+    };
+  }
 
   // Setup listeners for socket events
   Future<void> _setupSocketListeners() async {

@@ -132,7 +132,7 @@ class _CallScreenState extends State<CallScreen> {
     // Replace `socket` with your actual socket instance
     widget.socket.on('reject-call', (_) {
       if (mounted) {
-        _rejectCall();
+        _endcall();
       }
     });
   }
@@ -155,6 +155,14 @@ class _CallScreenState extends State<CallScreen> {
 
   void _rejectCall() {
     widget.socket.emit('reject-call', widget.callData);
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
+    _peerConnection.close();
+    Navigator.pop(context);
+  }
+
+  void _endcall() {
+    //widget.socket.emit('reject-call', widget.callData);
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _peerConnection.close();

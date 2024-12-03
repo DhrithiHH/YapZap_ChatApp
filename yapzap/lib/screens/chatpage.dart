@@ -50,7 +50,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .collection('messages')
           .doc(chatId)
           .collection('chatMessages')
-          .orderBy('timestamp')
+          .orderBy('timestamp', descending: true)
           .get();
 
       setState(() {

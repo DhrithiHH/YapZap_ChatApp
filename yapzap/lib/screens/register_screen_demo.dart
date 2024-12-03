@@ -40,7 +40,10 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
       final password = _passwordController.text.trim();
 
       // Validate input fields
-      if (userId.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty) {
+      if (userId.isEmpty ||
+          username.isEmpty ||
+          email.isEmpty ||
+          password.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please fill in all fields')),
         );
@@ -50,7 +53,8 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
       // Check if User ID already exists
       if (await _checkIfUserIdExists(userId)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User ID already exists. Please choose another.')),
+          const SnackBar(
+              content: Text('User ID already exists. Please choose another.')),
         );
         return;
       }
@@ -65,7 +69,8 @@ class _RegisterScreenDemoState extends State<RegisterScreenDemo> {
 
       // Register user with Firebase Auth
       // ignore: unused_local_variable
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );

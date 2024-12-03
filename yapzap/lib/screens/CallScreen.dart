@@ -32,7 +32,7 @@ class _CallScreenState extends State<CallScreen> {
     super.initState();
     _initializeRenderers();
     _listenForRejectCall();
-    _listenForEndCall(); // Listen for end-call events
+    _listenForEndCall(); // Listen for reject-call events
     if (!widget.isIncoming) {
       _startCall();
     }
@@ -135,7 +135,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _listenForEndCall() {
-    widget.socket.on('end-call', (_) {
+    widget.socket.on('reject-call', (_) {
       if (mounted) {
         _cleanupCall(); // Handle end call from the other side
       }

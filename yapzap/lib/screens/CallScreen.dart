@@ -31,7 +31,7 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     _initializeRenderers();
-
+    _listenForRejectCall();
     if (!widget.isIncoming) {
       _startCall();
     }
@@ -51,7 +51,6 @@ class _CallScreenState extends State<CallScreen> {
 
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
-
     // Initialize local media stream
     await _initLocalMedia();
   }
@@ -128,14 +127,13 @@ class _CallScreenState extends State<CallScreen> {
     });
   }
 
-  void _listenForRejectCall() {
-    // Replace `socket` with your actual socket instance
-    widget.socket.on('reject-call', (_) {
-      if (mounted) {
-        _endcall();
-      }
-    });
-  }
+void _listenForRejectCall() {
+  widget.socket.on('reject-call', (_) {
+    if (mounted) {
+      _endcall(); // Clean up and exit the call
+    }
+  });
+}
 
   void _acceptCall() async {
     setState(() {

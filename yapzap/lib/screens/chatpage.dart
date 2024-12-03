@@ -32,6 +32,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Listen for incoming messages
     widget.socket.on('message', _onMessageReceived);
+    widget.socket.on('call', _handleIncomingCall);
 
     // Fetch previous messages from Firestore
     _fetchPreviousMessages();

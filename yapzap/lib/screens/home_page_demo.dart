@@ -58,7 +58,7 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
 
     socket.on('connect', (_) => print('Connected to socket: ${socket.id}'));
     socket.on('disconnect', (_) => print('Disconnected from socket'));
-    socket.on('call-received', _handleIncomingCall);
+    socket.on('call', _handleIncomingCall);
   }
 
   void _disconnectSocket() {

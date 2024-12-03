@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
 class ChatScreen extends StatefulWidget {
   final String userId;
@@ -23,9 +25,21 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   bool _isSending = false;
 
+  // WebRTC-related
+  late RTCVideoRenderer _localRenderer;
+  late RTCVideoRenderer _remoteRenderer;
+  bool _isInCall = false;
+  Timer? _callTimer;
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize WebRTC renderers
+    _localRenderer = RTCVideoRenderer();
+    _remoteRenderer = RTCVideoRenderer();
+    _initializeRenderers();
+
     // Listen for incoming messages via socket
     widget.socket.on('message', _onMessageReceived);
 
@@ -33,10 +47,19 @@ class _ChatScreenState extends State<ChatScreen> {
     _fetchPreviousMessages();
   }
 
+  Future<void> _initializeRenderers() async {
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
+  }
+
   @override
   void dispose() {
-    // Remove the listener for chat messages
+    // Dispose WebRTC and socket listeners
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
     widget.socket.off('message', _onMessageReceived);
+
+    _callTimer?.cancel();
     super.dispose();
   }
 
@@ -67,7 +90,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onMessageReceived(dynamic data) {
-    debugPrint('Message received: $data');
     if (data['from'] != widget.userId) {
       setState(() {
         _messages.insert(0, {
@@ -84,7 +106,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isSending = true);
 
     List<String> users = [widget.userId, widget.peerId];
-    users.sort(); // Ensure consistent chatId generation
+    users.sort();
     String chatId = '${users[0]}_${users[1]}';
 
     final messageObject = {
@@ -94,25 +116,18 @@ class _ChatScreenState extends State<ChatScreen> {
     };
 
     try {
-      // Store the message in Firestore
       await FirebaseFirestore.instance
           .collection('messages')
           .doc(chatId)
           .collection('chatMessages')
           .add(messageObject);
 
-      debugPrint('Message stored in Firestore: $messageObject');
-
-      // Send the message via socket
       widget.socket.emit('message', {
         'message': message,
         'to': widget.peerId,
         'from': widget.userId,
       });
 
-      debugPrint('Message emitted: $messageObject');
-
-      // Update UI
       setState(() {
         _messages.insert(0, {
           'from': widget.userId,
@@ -128,6 +143,36 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // Show call screen
+  void _startCall() {
+    setState(() => _isInCall = true);
+
+    // Simulate a 30-second call
+    _callTimer = Timer(const Duration(seconds: 30), () {
+      _endCall();
+    });
+
+    widget.socket.emit('start-call', {
+      'from': widget.userId,
+      'to': widget.peerId,
+    });
+  }
+
+  void _endCall() {
+    setState(() => _isInCall = false);
+    _callTimer?.cancel();
+    Navigator.pop(context); // Return to the previous screen
+  }
+
+  void _rejectCall() {
+    setState(() => _isInCall = false);
+    widget.socket.emit('reject-call', {
+      'from': widget.userId,
+      'to': widget.peerId,
+    });
+    Navigator.pop(context); // Return to the previous screen
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message),
@@ -140,74 +185,115 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chat Page'),
-      ),
-      body: Column(
-        children: [
-          // Message Display Area
-          Expanded(
-            child: ListView.builder(
-              reverse: true,
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return Align(
-                  alignment: message['from'] == widget.userId
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin:
-                        const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: message['from'] == widget.userId
-                          ? Colors.blue[200]
-                          : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      message['message'],
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Text Input and Send Button
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: Icon(
-                    _isSending ? Icons.hourglass_empty : Icons.send,
-                    color: _isSending ? Colors.grey : Colors.blue,
-                  ),
-                  onPressed: _isSending
-                      ? null
-                      : () {
-                          String message = _messageController.text;
-                          if (message.isNotEmpty) {
-                            _sendMessage(message);
-                          }
-                        },
-                ),
-              ],
-            ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.call),
+            onPressed: () {
+              _startCall();
+            },
           ),
         ],
       ),
+      body: _isInCall
+          ? _buildCallScreen()
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    reverse: true,
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      return Align(
+                        alignment: message['from'] == widget.userId
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(
+                              vertical: 5, horizontal: 10),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: message['from'] == widget.userId
+                                ? Colors.blue[200]
+                                : Colors.grey[300],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            message['message'],
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: const InputDecoration(
+                            hintText: 'Type a message',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(
+                          _isSending ? Icons.hourglass_empty : Icons.send,
+                          color: _isSending ? Colors.grey : Colors.blue,
+                        ),
+                        onPressed: _isSending
+                            ? null
+                            : () {
+                                String message = _messageController.text;
+                                if (message.isNotEmpty) {
+                                  _sendMessage(message);
+                                }
+                              },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildCallScreen() {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: RTCVideoView(_remoteRenderer),
+        ),
+        Positioned(
+          top: 20,
+          right: 20,
+          width: 100,
+          height: 150,
+          child: RTCVideoView(
+            _localRenderer,
+            mirror: true,
+          ),
+        ),
+        Positioned(
+          bottom: 20,
+          left: 0,
+          right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.call_end, color: Colors.red),
+                onPressed: _endCall,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

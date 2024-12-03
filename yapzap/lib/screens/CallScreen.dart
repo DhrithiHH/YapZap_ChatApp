@@ -32,6 +32,7 @@ class _CallScreenState extends State<CallScreen> {
     super.initState();
     _initializeRenderers();
     _listenForRejectCall();
+    _listenForEndCall(); // Listen for end-call events
     if (!widget.isIncoming) {
       _startCall();
     }
@@ -127,13 +128,19 @@ class _CallScreenState extends State<CallScreen> {
     });
   }
 
-void _listenForRejectCall() {
-  widget.socket.on('reject-call', (_) {
-    if (mounted) {
-      _endcall(); // Clean up and exit the call
-    }
-  });
-}
+  void _listenForRejectCall() {
+    widget.socket.on('reject-call', (_) {
+      _cleanupCall(); // Clean up and exit the call
+    });
+  }
+
+  void _listenForEndCall() {
+    widget.socket.on('end-call', (_) {
+      if (mounted) {
+        _cleanupCall(); // Handle end call from the other side
+      }
+    });
+  }
 
   void _acceptCall() async {
     setState(() {
@@ -153,18 +160,22 @@ void _listenForRejectCall() {
 
   void _rejectCall() {
     widget.socket.emit('reject-call', widget.callData);
-    Navigator.pop(context);
+    _cleanupCall();
   }
 
-  void _endcall() {
-    //widget.socket.emit('reject-call', widget.callData);
+  void _endCall() {
+    widget.socket.emit('end-call', {
+      'to': widget.callData['from'],
+    });
+    _cleanupCall();
+  }
+
+  void _cleanupCall() {
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _peerConnection.close();
     Navigator.pop(context);
   }
-
-  
 
   void _toggleVideo() {
     setState(() {
@@ -209,7 +220,7 @@ void _listenForRejectCall() {
         if (_isCallAccepted || !widget.isIncoming)
           IconButton(
             icon: const Icon(Icons.call_end, color: Colors.red),
-            onPressed: () => Navigator.pop(context), // End the call
+            onPressed: _endCall, // End the call
           ),
       ],
     );

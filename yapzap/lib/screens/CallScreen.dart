@@ -164,7 +164,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _endCall() {
-    widget.socket.emit('end-call', {
+    widget.socket.emit('reject-call', {
       'to': widget.callData['from'],
     });
     _cleanupCall();

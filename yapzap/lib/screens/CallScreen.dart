@@ -122,9 +122,18 @@ class _CallScreenState extends State<CallScreen> {
     await _peerConnection.setLocalDescription(offer);
 
     // Send the offer to the other peer via the signaling server
-    widget.socket.emit('call-offer', {
-      'to': widget.callData['to'],
+    widget.socket.emit('offer', {
       'offer': offer.toMap(),
+      'to': widget.callData['to'],
+    });
+  }
+
+  void _listenForRejectCall() {
+    // Replace `socket` with your actual socket instance
+    widget.socket.on('reject-call', (_) {
+      if (mounted) {
+        _rejectCall();
+      }
     });
   }
 
@@ -139,15 +148,20 @@ class _CallScreenState extends State<CallScreen> {
     await _peerConnection.setLocalDescription(answer);
 
     widget.socket.emit('answer', {
-      'to': widget.callData['from'],
       'answer': answer.toMap(),
+      'to': widget.callData['from'],
     });
   }
 
   void _rejectCall() {
     widget.socket.emit('reject-call', widget.callData);
-    Navigator.pop(context); // Exit the call screen
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
+    _peerConnection.close();
+    Navigator.pop(context);
   }
+
+  
 
   void _toggleVideo() {
     setState(() {

@@ -15,7 +15,8 @@ class HomePageDemo extends StatefulWidget {
   _HomePageDemoState createState() => _HomePageDemoState();
 }
 
-class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver {
+class _HomePageDemoState extends State<HomePageDemo>
+    with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -50,10 +51,8 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
   void _connectSocket() {
     socket = IO.io(
       'http://server-ouzf.onrender.com', // Replace with your server URL
-      IO.OptionBuilder()
-          .setTransports(['websocket'])
-          .setQuery({'userId': widget.userId})
-          .build(),
+      IO.OptionBuilder().setTransports(['websocket']).setQuery(
+          {'userId': widget.userId}).build(),
     );
 
     socket.on('connect', (_) => print('Connected to socket: ${socket.id}'));
@@ -91,7 +90,8 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CallScreen(callData: data, socket: socket, isIncoming: true),
+        builder: (context) =>
+            CallScreen(callData: data, socket: socket, isIncoming: true),
       ),
     );
   }
@@ -111,7 +111,8 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
           children: [
             // Search Bar
             Container(
-              padding: const EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0),
+              padding:
+                  const EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0),
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
@@ -137,14 +138,21 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
             // Contacts List
             Expanded(
               child: StreamBuilder<DocumentSnapshot>(
-                stream: _firestore.collection('users').doc(widget.userId).snapshots(),
+                stream: _firestore
+                    .collection('users')
+                    .doc(widget.userId)
+                    .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (snapshot.hasError || !snapshot.hasData || snapshot.data == null || !snapshot.data!.exists) {
-                    return const Center(child: Text('Failed to load contacts.'));
+                  if (snapshot.hasError ||
+                      !snapshot.hasData ||
+                      snapshot.data == null ||
+                      !snapshot.data!.exists) {
+                    return const Center(
+                        child: Text('Failed to load contacts.'));
                   }
 
                   final userDoc = snapshot.data!;
@@ -152,7 +160,9 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
                   final contacts = List<String>.from(data['contacts'] ?? []);
 
                   final filteredContacts = contacts.where((contactId) {
-                    return contactId.toLowerCase().contains(_searchQuery.toLowerCase());
+                    return contactId
+                        .toLowerCase()
+                        .contains(_searchQuery.toLowerCase());
                   }).toList();
 
                   return filteredContacts.isEmpty
@@ -163,27 +173,39 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
                             final contactId = filteredContacts[index];
 
                             return FutureBuilder<DocumentSnapshot>(
-                              future: _firestore.collection('users').doc(contactId).get(),
+                              future: _firestore
+                                  .collection('users')
+                                  .doc(contactId)
+                                  .get(),
                               builder: (context, contactSnapshot) {
-                                if (contactSnapshot.connectionState == ConnectionState.waiting) {
-                                  return const ListTile(title: Text('Loading...'));
+                                if (contactSnapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const ListTile(
+                                      title: Text('Loading...'));
                                 }
 
                                 if (contactSnapshot.hasError ||
                                     !contactSnapshot.hasData ||
                                     !contactSnapshot.data!.exists) {
-                                  return const ListTile(title: Text('Error loading contact'));
+                                  return const ListTile(
+                                      title: Text('Error loading contact'));
                                 }
 
-                                final contactData = contactSnapshot.data!.data() as Map<String, dynamic>;
-                                final username = contactData['username'] ?? 'Unknown User';
-                                final profilePic = contactData['profilePic'] ?? '';
+                                final contactData = contactSnapshot.data!.data()
+                                    as Map<String, dynamic>;
+                                final username =
+                                    contactData['username'] ?? 'Unknown User';
+                                final profilePic =
+                                    contactData['profilePic'] ?? '';
 
                                 return ListTile(
                                   leading: CircleAvatar(
-                                    backgroundImage: profilePic.isNotEmpty ? NetworkImage(profilePic) : null,
+                                    backgroundImage: profilePic.isNotEmpty
+                                        ? NetworkImage(profilePic)
+                                        : null,
                                     child: profilePic.isEmpty
-                                        ? const Icon(Icons.person, color: Colors.white)
+                                        ? const Icon(Icons.person,
+                                            color: Colors.white)
                                         : null,
                                   ),
                                   title: Text(username),
@@ -192,12 +214,16 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.call, color: Colors.green),
-                                        onPressed: () => _initiateCall(contactId, 'audio'),
+                                        icon: const Icon(Icons.call,
+                                            color: Colors.green),
+                                        onPressed: () =>
+                                            _initiateCall(contactId, 'audio'),
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.videocam, color: Colors.blue),
-                                        onPressed: () => _initiateCall(contactId, 'video'),
+                                        icon: const Icon(Icons.videocam,
+                                            color: Colors.blue),
+                                        onPressed: () =>
+                                            _initiateCall(contactId, 'video'),
                                       ),
                                     ],
                                   ),
@@ -219,6 +245,22 @@ class _HomePageDemoState extends State<HomePageDemo> with WidgetsBindingObserver
                           },
                         );
                 },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: FloatingActionButton(
+                backgroundColor: const Color(0xFF00A86B),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ConnectPage(userId: widget.userId, socket: socket),
+                    ),
+                  );
+                },
+                child: const Icon(Icons.add, color: Colors.white),
               ),
             ),
           ],

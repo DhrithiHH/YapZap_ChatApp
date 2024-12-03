@@ -155,9 +155,6 @@ class _CallScreenState extends State<CallScreen> {
 
   void _rejectCall() {
     widget.socket.emit('reject-call', widget.callData);
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
-    _peerConnection.close();
     Navigator.pop(context);
   }
 

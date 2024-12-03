@@ -24,6 +24,8 @@ class _CallScreenState extends State<CallScreen> {
   bool _isVideoEnabled = true;
   bool _isAudioEnabled = true;
   bool _isCallAccepted = false;
+  late RTCPeerConnection _peerConnection;
+  late MediaStream _localStream;
 
   @override
   void initState() {
@@ -39,6 +41,7 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     _localRenderer.dispose();
     _remoteRenderer.dispose();
+    _peerConnection.close();
     super.dispose();
   }
 
@@ -48,19 +51,97 @@ class _CallScreenState extends State<CallScreen> {
 
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
+
+    // Initialize local media stream
+    await _initLocalMedia();
   }
 
-  void _startCall() {
-    // Logic for initiating a call with WebRTC
-    // Send offer to the peer via socket
-    widget.socket.emit('start-call', widget.callData);
+  Future<void> _initLocalMedia() async {
+    final mediaConstraints = {
+      'audio': true,
+      'video': {
+        'facingMode': 'user', // Use the front camera
+        'width': 1280,
+        'height': 720,
+      },
+    };
+
+    // Get user media (audio and video)
+    MediaStream stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+
+    // Assign local video to renderer
+    _localRenderer.srcObject = stream;
+
+    // Save the local media stream
+    _localStream = stream;
+
+    // Create the peer connection and add tracks
+    await _createPeerConnection();
   }
 
-  void _acceptCall() {
+  Future<void> _createPeerConnection() async {
+    // Configuration for the peer connection
+    final config = {
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+      ],
+    };
+
+    // Create the peer connection
+    _peerConnection = await createPeerConnection(config);
+
+    // Add tracks to the peer connection
+    for (var track in _localStream.getTracks()) {
+      await _peerConnection.addTrack(track, _localStream);
+    }
+
+    // Handle ICE candidates
+    _peerConnection.onIceCandidate = (candidate) {
+      if (candidate != null) {
+        widget.socket.emit('ice-candidate', {
+          'to': widget.callData['from'],
+          'candidate': candidate.toMap(),
+        });
+      }
+    };
+
+    // Handle remote stream
+    _peerConnection.onTrack = (RTCTrackEvent event) {
+      if (event.streams.isNotEmpty) {
+        setState(() {
+          _remoteRenderer.srcObject = event.streams.first;
+        });
+      }
+    };
+  }
+
+  void _startCall() async {
+    final offer = await _peerConnection.createOffer();
+
+    // Set local description with the offer
+    await _peerConnection.setLocalDescription(offer);
+
+    // Send the offer to the other peer via the signaling server
+    widget.socket.emit('call-offer', {
+      'to': widget.callData['to'],
+      'offer': offer.toMap(),
+    });
+  }
+
+  void _acceptCall() async {
     setState(() {
       _isCallAccepted = true;
     });
-    widget.socket.emit('accept-call', widget.callData);
+
+    final answer = await _peerConnection.createAnswer();
+
+    // Set local description with the answer
+    await _peerConnection.setLocalDescription(answer);
+
+    widget.socket.emit('answer', {
+      'to': widget.callData['from'],
+      'answer': answer.toMap(),
+    });
   }
 
   void _rejectCall() {
@@ -72,14 +153,22 @@ class _CallScreenState extends State<CallScreen> {
     setState(() {
       _isVideoEnabled = !_isVideoEnabled;
     });
-    // Add WebRTC logic to enable/disable video stream
+
+    // Enable or disable video
+    _localStream.getVideoTracks().forEach((track) {
+      track.enabled = _isVideoEnabled;
+    });
   }
 
   void _toggleAudio() {
     setState(() {
       _isAudioEnabled = !_isAudioEnabled;
     });
-    // Add WebRTC logic to enable/disable audio stream
+
+    // Enable or disable audio
+    _localStream.getAudioTracks().forEach((track) {
+      track.enabled = _isAudioEnabled;
+    });
   }
 
   Widget _buildBottomBar() {

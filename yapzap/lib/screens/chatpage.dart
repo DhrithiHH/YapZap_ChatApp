@@ -28,15 +28,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void initState() {
-    super.initState();
+  super.initState();
 
-    // Listen for incoming messages
-    widget.socket.on('message', _onMessageReceived);
-    widget.socket.on('call', _handleIncomingCall);
+  // Listen for incoming messages
+  widget.socket.on('message', _onMessageReceived);
 
-    // Fetch previous messages from Firestore
-    _fetchPreviousMessages();
-  }
+  // Listen for incoming calls
+  widget.socket.on('call', _handleIncomingCall);
+
+  // Fetch previous messages
+  _fetchPreviousMessages();
+}
 
   @override
   void dispose() {

@@ -102,7 +102,7 @@ class _HomePageDemoState extends State<HomePageDemo>
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF00A86B), Color(0xFF5AC18E)],
+            colors: [Color(0XFF5D8F), Color.fromARGB(0, 199, 87, 130)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

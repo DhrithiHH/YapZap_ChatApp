@@ -204,10 +204,16 @@ void _startCallTimer() {
 
   void _connectToSignaling() {
     widget.socket.on('offer', (data) {
-      if (data['to'] == widget.callData['from']) {
-        _acceptCall(data['offer']);
-      }
-    });
+    print("Received offer data: $data");  // Check what is being received
+    if (data != null && data['to'] == widget.callData['from']) {
+    _acceptCall(data['offer']);
+  } else {
+    // Handle the case where data is invalid
+    widget.socket.emit('error',{
+      'message' : "null",
+    })
+  }
+});
 
     widget.socket.on('answer', (data) {
       if (data['to'] == widget.callData['from']) {

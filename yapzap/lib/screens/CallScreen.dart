@@ -168,32 +168,25 @@ class _CallScreenState extends State<CallScreen> {
 
   void _connectToSignaling() {
     widget.socket.on('offer', (data) {
-      if (data['to'] == widget.callData['from']) {
         _acceptCall(data['offer']);
-      }
     });
 
     widget.socket.on('answer', (data) {
-      if (data['to'] == widget.callData['from']) {
         _peerConnection.setRemoteDescription(RTCSessionDescription(data['answer']['sdp'], data['answer']['type']));
-      }
     });
 
     widget.socket.on('ice-candidate', (data) {
-      if (data['to'] == widget.callData['from']) {
         final candidate = RTCIceCandidate(
           data['candidate']['candidate'],
           data['candidate']['sdpMid'],
           data['candidate']['sdpMLineIndex'],
         );
         _peerConnection.addCandidate(candidate);
-      }
     });
 
     widget.socket.on('end-call', (data) {
-      if (data['to'] == widget.callData['from']) {
+      // if (data['to'] == widget.callData['from']) {
         _endCall();
-      }
     });
   }
 

@@ -29,6 +29,10 @@
 // }
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:yapzap/screens/anonymous/anonymous_chat_lobby_page.dart';
+import 'package:yapzap/screens/anonymous/anonymous_entry_page.dart';
+import 'package:yapzap/screens/anonymous/chat_interface_page.dart';
+import 'package:yapzap/screens/anonymous/random_matchmaking_page.dart';
 import 'package:yapzap/screens/forgot_password_page.dart';
 import 'package:yapzap/screens/user_profile_page.dart';
 // import 'package:yapzap/screens/connect.dart';
@@ -43,8 +47,8 @@ import 'screens/login_page.dart';
 import 'screens/register_page.dart';
 // import 'screens/chat_list.dart';
 import 'screens/home.dart';
-import 'screens/friend_details_page.dart';
-import 'models/friend_model.dart';
+// import 'screens/friend_details_page.dart';
+// import 'models/friend_model.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,7 +74,11 @@ class MyApp extends StatelessWidget {
         // '/chatscreen': (context) => WebRTCChatApp(),
         '/forgotpassword': (context) => const ForgotPasswordPage(),
         '/homepage': (context) => const Home(userId: "charan"),
-        '/userprofilepage': (context) => UserProfilePage(),
+        '/userprofilepage': (context) => const UserProfilePage(),
+        '/AnonymousEntryPage': (context) => AnonymousEntryPage(),
+        '/AnonymousChatLobbyPage': (context) => AnonymousChatLobbyPage(),
+        '/RandomMatchmakingPage': (context) => RandomMatchmakingPage(),
+        '/ChatInterfacePage': (context) => ChatInterfacePage(),
       },
     );
   }

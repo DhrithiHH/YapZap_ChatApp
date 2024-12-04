@@ -76,6 +76,30 @@ class NavigationTestScreen extends StatelessWidget {
             },
             child: Text('Go to UserProfilePage'),
           ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/AnonymousEntryPage');
+            },
+            child: Text('Go to AnonymousEntryPage'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/AnonymousChatLobbyPage');
+            },
+            child: Text('Go to AnonymousChatLobbyPage'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/RandomMatchmakingPage');
+            },
+            child: Text('Go to RandomMatchmakingPage'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/ChatInterfacePage');
+            },
+            child: Text('Go to ChatInterfacePage'),
+          ),
         ],
       ),
     );

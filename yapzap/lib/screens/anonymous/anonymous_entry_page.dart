@@ -45,7 +45,7 @@ class _AnonymousEntryPageState extends State<AnonymousEntryPage> {
               onPressed: () {
                 Navigator.pushNamedAndRemoveUntil(
                   context,
-                  '/mainEntryPage', // Replace with your main entry page route
+                  '/homepage', // Replace with your main entry page route
                   (Route<dynamic> route) => false,
                 );
               },

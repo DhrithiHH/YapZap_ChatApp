@@ -211,7 +211,7 @@ void _startCallTimer() {
     // Handle the case where data is invalid
     widget.socket.emit('error',{
       'message' : "null",
-    })
+    });
   }
 });
 

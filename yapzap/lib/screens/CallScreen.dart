@@ -25,6 +25,7 @@ class _CallScreenState extends State<CallScreen> {
   late MediaStream _localStream;
   bool _isMuted = false;
   bool _isVideoEnabled = true;
+  bool _isInCall = false; // Tracks if the call is accepted and ongoing
 
   @override
   void initState() {
@@ -130,6 +131,10 @@ class _CallScreenState extends State<CallScreen> {
       'from': widget.callData['to'],
       'to': widget.callData['from'],
     });
+
+    setState(() {
+      _isInCall = true; // Change to in-call state
+    });
   }
 
   void _rejectCall() {
@@ -168,25 +173,24 @@ class _CallScreenState extends State<CallScreen> {
 
   void _connectToSignaling() {
     widget.socket.on('offer', (data) {
-        _acceptCall(data['offer']);
+      _acceptCall(data['offer']);
     });
 
     widget.socket.on('answer', (data) {
-        _peerConnection.setRemoteDescription(RTCSessionDescription(data['answer']['sdp'], data['answer']['type']));
+      _peerConnection.setRemoteDescription(RTCSessionDescription(data['answer']['sdp'], data['answer']['type']));
     });
 
     widget.socket.on('ice-candidate', (data) {
-        final candidate = RTCIceCandidate(
-          data['candidate']['candidate'],
-          data['candidate']['sdpMid'],
-          data['candidate']['sdpMLineIndex'],
-        );
-        _peerConnection.addCandidate(candidate);
+      final candidate = RTCIceCandidate(
+        data['candidate']['candidate'],
+        data['candidate']['sdpMid'],
+        data['candidate']['sdpMLineIndex'],
+      );
+      _peerConnection.addCandidate(candidate);
     });
 
     widget.socket.on('end-call', (data) {
-      // if (data['to'] == widget.callData['from']) {
-        _endCall();
+      _endCall();
     });
   }
 
@@ -195,7 +199,7 @@ class _CallScreenState extends State<CallScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: widget.isIncoming
+        child: !_isInCall
             ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -208,6 +212,7 @@ class _CallScreenState extends State<CallScreen> {
                           icon: Icon(Icons.call, color: Colors.green, size: 40),
                           onPressed: () {
                             _connectToSignaling();
+                            _acceptCall(widget.callData['offer']);
                           },
                         ),
                         SizedBox(width: 20),
@@ -235,17 +240,26 @@ class _CallScreenState extends State<CallScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        IconButton(
-                          icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: Colors.white),
-                          onPressed: _toggleMute,
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: IconButton(
+                            icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: Colors.white),
+                            onPressed: _toggleMute,
+                          ),
                         ),
-                        IconButton(
-                          icon: Icon(_isVideoEnabled ? Icons.videocam : Icons.videocam_off, color: Colors.white),
-                          onPressed: _toggleVideo,
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: IconButton(
+                            icon: Icon(_isVideoEnabled ? Icons.videocam : Icons.videocam_off, color: Colors.white),
+                            onPressed: _toggleVideo,
+                          ),
                         ),
-                        IconButton(
-                          icon: Icon(Icons.call_end, color: Colors.red),
-                          onPressed: _endCall,
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: IconButton(
+                            icon: Icon(Icons.call_end, color: Colors.red),
+                            onPressed: _endCall,
+                          ),
                         ),
                       ],
                     ),

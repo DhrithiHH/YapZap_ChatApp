@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class CallScreen extends StatefulWidget {
-  final Map<String, dynamic> callData;
   final IO.Socket socket;
+  final Map<String, dynamic> callData;
   final bool isIncoming;
 
   const CallScreen({
@@ -21,21 +22,18 @@ class CallScreen extends StatefulWidget {
 class _CallScreenState extends State<CallScreen> {
   late RTCVideoRenderer _localRenderer;
   late RTCVideoRenderer _remoteRenderer;
-  bool _isVideoEnabled = true;
-  bool _isAudioEnabled = true;
-  bool _isCallAccepted = false;
   late RTCPeerConnection _peerConnection;
   late MediaStream _localStream;
+  late Timer _callTimer;
 
   @override
   void initState() {
-    super.initState();
+     super.initState();
     _initializeRenderers();
-    _listenForRejectCall();
-    _listenForEndCall(); // Listen for reject-call events
-    if (!widget.isIncoming) {
-      _startCall();
-    }
+    _connectToSignaling();
+
+    // Start timer for call duration
+    _startCallTimer();
   }
 
   @override
@@ -45,14 +43,19 @@ class _CallScreenState extends State<CallScreen> {
     _peerConnection.close();
     super.dispose();
   }
-
+void _startCallTimer() {
+     _callTimer = Timer(Duration(seconds: 30), () {
+      _endCall(); // Automatically end the call after 30 seconds
+    });
+  }
   Future<void> _initializeRenderers() async {
     _localRenderer = RTCVideoRenderer();
     _remoteRenderer = RTCVideoRenderer();
 
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
-    // Initialize local media stream
+
+    // Get local media
     await _initLocalMedia();
   }
 
@@ -60,52 +63,43 @@ class _CallScreenState extends State<CallScreen> {
     final mediaConstraints = {
       'audio': true,
       'video': {
-        'facingMode': 'user', // Use the front camera
+        'facingMode': 'user',
         'width': 1280,
         'height': 720,
       },
     };
 
-    // Get user media (audio and video)
     MediaStream stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-
-    // Assign local video to renderer
     _localRenderer.srcObject = stream;
-
-    // Save the local media stream
     _localStream = stream;
 
-    // Create the peer connection and add tracks
     await _createPeerConnection();
   }
 
   Future<void> _createPeerConnection() async {
-    // Configuration for the peer connection
     final config = {
       'iceServers': [
         {'urls': 'stun:stun.l.google.com:19302'},
       ],
     };
 
-    // Create the peer connection
     _peerConnection = await createPeerConnection(config);
 
-    // Add tracks to the peer connection
-    for (var track in _localStream.getTracks()) {
-      await _peerConnection.addTrack(track, _localStream);
-    }
+    // Add local tracks to the peer connection
+    _localStream.getTracks().forEach((track) {
+      _peerConnection.addTrack(track, _localStream);
+    });
 
-    // Handle ICE candidates
     _peerConnection.onIceCandidate = (candidate) {
       if (candidate != null) {
         widget.socket.emit('ice-candidate', {
-          'to': widget.callData['from'],
+          'from': widget.callData['from'],
+          'to': widget.callData['to'],
           'candidate': candidate.toMap(),
         });
       }
     };
 
-    // Handle remote stream
     _peerConnection.onTrack = (RTCTrackEvent event) {
       if (event.streams.isNotEmpty) {
         setState(() {
@@ -117,132 +111,58 @@ class _CallScreenState extends State<CallScreen> {
 
   void _startCall() async {
     final offer = await _peerConnection.createOffer();
-
-    // Set local description with the offer
     await _peerConnection.setLocalDescription(offer);
 
-    // Send the offer to the other peer via the signaling server
     widget.socket.emit('offer', {
-      'offer': offer.toMap(),
+      'from': widget.callData['from'],
       'to': widget.callData['to'],
+      'type': widget.callData['type'],
+      'offer': offer.toMap(),
     });
   }
 
-  void _listenForRejectCall() {
-    widget.socket.on('reject-call', (_) {
-      _cleanupCall(); // Clean up and exit the call
-    });
-  }
-
-  void _listenForEndCall() {
-    widget.socket.on('reject-call', (_) {
-      if (mounted) {
-        _cleanupCall(); // Handle end call from the other side
-      }
-    });
-  }
-
-  void _acceptCall() async {
-    setState(() {
-      _isCallAccepted = true;
-    });
-
+  void _acceptCall(Map<String, dynamic> offer) async {
+    await _peerConnection.setRemoteDescription(RTCSessionDescription(offer['sdp'], offer['type']));
     final answer = await _peerConnection.createAnswer();
-
-    // Set local description with the answer
     await _peerConnection.setLocalDescription(answer);
 
     widget.socket.emit('answer', {
+      'from': widget.callData['to'], // Receiver sends back
+      'to': widget.callData['from'], // Original caller
       'answer': answer.toMap(),
-      'to': widget.callData['from'],
     });
-  }
-
-  void _rejectCall() {
-    widget.socket.emit('reject-call', widget.callData);
-    _cleanupCall();
   }
 
   void _endCall() {
-    widget.socket.emit('reject-call', {
-      'to': widget.callData['from'],
-    });
-    _cleanupCall();
-  }
+  if (_callTimer.isActive) _callTimer.cancel();
 
-  void _cleanupCall() {
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
-    _peerConnection.close();
-    Navigator.pop(context);
-  }
+  // Emit end-call signal
+  widget.socket.emit('end-call', {
+    'from': widget.callData['from'],
+    'to': widget.callData['to'],
+  });
 
-  void _toggleVideo() {
-    setState(() {
-      _isVideoEnabled = !_isVideoEnabled;
-    });
+  // Cleanup connections
+  _peerConnection.close();
+  _peerConnection.dispose();
 
-    // Enable or disable video
-    _localStream.getVideoTracks().forEach((track) {
-      track.enabled = _isVideoEnabled;
-    });
-  }
+  _localStream.getTracks().forEach((track) {
+    track.stop(); // Stops audio/video tracks
+  });
+  _localStream.dispose();
 
-  void _toggleAudio() {
-    setState(() {
-      _isAudioEnabled = !_isAudioEnabled;
-    });
+  _localRenderer.dispose();
+  _remoteRenderer.dispose();
 
-    // Enable or disable audio
-    _localStream.getAudioTracks().forEach((track) {
-      track.enabled = _isAudioEnabled;
-    });
-  }
+  // Remove socket listeners
+  widget.socket.off('offer');
+  widget.socket.off('answer');
+  widget.socket.off('ice-candidate');
+  widget.socket.off('end-call');
 
-  Widget _buildBottomBar() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        IconButton(
-          icon: Icon(
-            _isVideoEnabled ? Icons.videocam : Icons.videocam_off,
-            color: Colors.white,
-          ),
-          onPressed: _toggleVideo,
-        ),
-        IconButton(
-          icon: Icon(
-            _isAudioEnabled ? Icons.mic : Icons.mic_off,
-            color: Colors.white,
-          ),
-          onPressed: _toggleAudio,
-        ),
-        if (_isCallAccepted || !widget.isIncoming)
-          IconButton(
-            icon: const Icon(Icons.call_end, color: Colors.red),
-            onPressed: _endCall, // End the call
-          ),
-      ],
-    );
-  }
+  Navigator.pop(context); // Return to the previous screen
+}
 
-  Widget _buildIncomingCallActions() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        FloatingActionButton(
-          backgroundColor: Colors.green,
-          onPressed: _acceptCall,
-          child: const Icon(Icons.call, color: Colors.white),
-        ),
-        FloatingActionButton(
-          backgroundColor: Colors.red,
-          onPressed: _rejectCall,
-          child: const Icon(Icons.call_end, color: Colors.white),
-        ),
-      ],
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -251,12 +171,9 @@ class _CallScreenState extends State<CallScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            // Remote video
             Positioned.fill(
               child: RTCVideoView(_remoteRenderer),
             ),
-
-            // Local video (in the corner)
             Positioned(
               top: 20,
               right: 20,
@@ -267,27 +184,60 @@ class _CallScreenState extends State<CallScreen> {
                 mirror: true,
               ),
             ),
-
-            // Bottom bar
-            if (_isCallAccepted || !widget.isIncoming)
-              Positioned(
-                bottom: 20,
-                left: 0,
-                right: 0,
-                child: _buildBottomBar(),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.call_end, color: Colors.red),
+                    onPressed: _endCall,
+                  ),
+                ],
               ),
-
-            // Incoming call actions
-            if (!_isCallAccepted && widget.isIncoming)
-              Positioned(
-                bottom: 20,
-                left: 0,
-                right: 0,
-                child: _buildIncomingCallActions(),
-              ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  void _connectToSignaling() {
+    widget.socket.on('offer', (data) {
+      if (data['to'] == widget.callData['from']) {
+        _acceptCall(data['offer']);
+      }
+    });
+
+    widget.socket.on('answer', (data) {
+      if (data['to'] == widget.callData['from']) {
+        _peerConnection.setRemoteDescription(RTCSessionDescription(data['answer']['sdp'], data['answer']['type']));
+      }
+    });
+
+    widget.socket.on('ice-candidate', (data) {
+      if (data['to'] == widget.callData['from']) {
+        final candidate = RTCIceCandidate(
+          data['candidate']['candidate'],
+          data['candidate']['sdpMid'],
+          data['candidate']['sdpMLineIndex'],
+        );
+        _peerConnection.addCandidate(candidate); // Updated method
+      }
+    });
+
+    widget.socket.on('end-call', (data) {
+      if (data['to'] == widget.callData['from']) {
+        _endCall();
+      }
+    });
+
+    if (widget.isIncoming) {
+      _acceptCall(widget.callData['offer']);
+    } else {
+      _startCall();
+    }
+  }
+  
+  
 }

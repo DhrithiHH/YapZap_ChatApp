@@ -31,8 +31,9 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     _initializeRenderers();
+    _connectToSignaling();
+
     if (!widget.isIncoming) {
-      _connectToSignaling();
       _startCall();
     }
   }
@@ -52,7 +53,9 @@ class _CallScreenState extends State<CallScreen> {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
 
-    await _initLocalMedia();
+    if (!widget.isIncoming) {
+      await _initLocalMedia();
+    }
   }
 
   Future<void> _initLocalMedia() async {
@@ -114,15 +117,18 @@ class _CallScreenState extends State<CallScreen> {
       'from': widget.callData['from'],
       'type': widget.callData['type'],
     });
+
+    setState(() {
+      _isInCall = true;
+    });
   }
 
-  void _acceptCall(Map<String, dynamic>? offer) async {
-    if (offer == null || offer['sdp'] == null || offer['type'] == null) {
-      widget.socket.emit('error', {'message': 'Invalid offer received'});
-      return;
-    }
+  void _acceptCall() async {
+    await _initLocalMedia();
 
+    final offer = widget.callData['offer'];
     await _peerConnection.setRemoteDescription(RTCSessionDescription(offer['sdp'], offer['type']));
+
     final answer = await _peerConnection.createAnswer();
     await _peerConnection.setLocalDescription(answer);
 
@@ -133,7 +139,7 @@ class _CallScreenState extends State<CallScreen> {
     });
 
     setState(() {
-      _isInCall = true; // Change to in-call state
+      _isInCall = true;
     });
   }
 
@@ -172,12 +178,12 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _connectToSignaling() {
-    widget.socket.on('offer', (data) {
-      _acceptCall(data['offer']);
+    widget.socket.on('reject-call', (_) {
+      Navigator.pop(context);
     });
 
-    widget.socket.on('answer', (data) {
-      _peerConnection.setRemoteDescription(RTCSessionDescription(data['answer']['sdp'], data['answer']['type']));
+    widget.socket.on('end-call', (_) {
+      Navigator.pop(context);
     });
 
     widget.socket.on('ice-candidate', (data) {
@@ -187,10 +193,6 @@ class _CallScreenState extends State<CallScreen> {
         data['candidate']['sdpMLineIndex'],
       );
       _peerConnection.addCandidate(candidate);
-    });
-
-    widget.socket.on('end-call', (data) {
-      _endCall();
     });
   }
 
@@ -210,10 +212,7 @@ class _CallScreenState extends State<CallScreen> {
                       children: [
                         IconButton(
                           icon: Icon(Icons.call, color: Colors.green, size: 40),
-                          onPressed: () {
-                            _connectToSignaling();
-                            _acceptCall(widget.callData['offer']);
-                          },
+                          onPressed: _acceptCall,
                         ),
                         SizedBox(width: 20),
                         IconButton(

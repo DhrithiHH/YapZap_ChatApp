@@ -93,9 +93,9 @@ void _startCallTimer() {
     _peerConnection.onIceCandidate = (candidate) {
       if (candidate != null) {
         widget.socket.emit('ice-candidate', {
-          'from': widget.callData['from'],
-          'to': widget.callData['to'],
           'candidate': candidate.toMap(),
+          'to': widget.callData['to'],
+          'from': widget.callData['from'],
         });
       }
     };
@@ -114,10 +114,10 @@ void _startCallTimer() {
     await _peerConnection.setLocalDescription(offer);
 
     widget.socket.emit('offer', {
-      'from': widget.callData['from'],
-      'to': widget.callData['to'],
-      'type': widget.callData['type'],
       'offer': offer.toMap(),
+      'to': widget.callData['to'],
+      'from': widget.callData['from'],
+      'type': widget.callData['type'],
     });
   }
 
@@ -127,9 +127,9 @@ void _startCallTimer() {
     await _peerConnection.setLocalDescription(answer);
 
     widget.socket.emit('answer', {
+      'answer': answer.toMap(),
       'from': widget.callData['to'], // Receiver sends back
       'to': widget.callData['from'], // Original caller
-      'answer': answer.toMap(),
     });
   }
 

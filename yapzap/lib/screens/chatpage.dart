@@ -140,7 +140,7 @@ class _ChatScreenState extends State<ChatScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CallScreen(callData: callData, socket: widget.socket),
+        builder: (context) => CallPage(data: callData, socket: widget.socket),
       ),
     );
   }
@@ -149,7 +149,7 @@ class _ChatScreenState extends State<ChatScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CallScreen(callData: data, socket: widget.socket, isIncoming: true),
+        builder: (context) => CallPage(data: data, socket: widget.socket, incoming: true),
       ),
     );
   }

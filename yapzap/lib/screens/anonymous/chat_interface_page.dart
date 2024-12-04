@@ -1,22 +1,73 @@
 import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class ChatInterfacePage extends StatefulWidget {
+  final String userId; // Unique identifier for the anonymous user
+
+  ChatInterfacePage({required this.userId});
+
   @override
   _ChatInterfacePageState createState() => _ChatInterfacePageState();
 }
 
 class _ChatInterfacePageState extends State<ChatInterfacePage> {
+  late IO.Socket socket;
   final TextEditingController _messageController = TextEditingController();
-  List<String> _messages = [];
+  List<Map<String, String>> _messages = []; // List of messages with sender info
 
+  @override
+  void initState() {
+    super.initState();
+    _connectToServer();
+  }
+
+  // Connects to the WebSocket server
+  void _connectToServer() {
+    socket = IO.io(
+      'http://your-server-url:3000', // Replace with your server URL
+      IO.OptionBuilder()
+          .setTransports(['websocket']) // Use WebSocket transport
+          .disableAutoConnect()
+          .build(),
+    );
+
+    socket.connect();
+
+    // Listen for events
+    socket.onConnect((_) {
+      print("Connected to server");
+      socket.emit("join", {"userId": widget.userId}); // Emit join event
+    });
+
+    socket.on("message", (data) {
+      // Update UI when a new message is received
+      setState(() {
+        _messages.add({"sender": data["sender"], "message": data["message"]});
+      });
+    });
+
+    socket.onDisconnect((_) => print("Disconnected from server"));
+  }
+
+  // Sends a message to the server
   void sendMessage() {
     String message = _messageController.text.trim();
     if (message.isNotEmpty) {
       setState(() {
-        _messages.add(message);
-        _messageController.clear();
+        _messages.add({"sender": "You", "message": message});
       });
+      socket.emit("message", {
+        "sender": widget.userId,
+        "message": message,
+      });
+      _messageController.clear();
     }
+  }
+
+  @override
+  void dispose() {
+    socket.disconnect(); // Disconnect from server
+    super.dispose();
   }
 
   @override
@@ -27,7 +78,10 @@ class _ChatInterfacePageState extends State<ChatInterfacePage> {
         backgroundColor: Color(0xFF7DD2B3), // Green color from theme
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            socket.emit("disconnect_user", {"userId": widget.userId});
+            Navigator.pop(context);
+          },
         ),
       ),
       body: Column(
@@ -37,21 +91,22 @@ class _ChatInterfacePageState extends State<ChatInterfacePage> {
               padding: EdgeInsets.all(10),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
+                bool isSentByUser = _messages[index]["sender"] == "You";
                 return Align(
-                  alignment: index % 2 == 0
-                      ? Alignment.centerLeft
-                      : Alignment.centerRight,
+                  alignment: isSentByUser
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
                     margin: EdgeInsets.symmetric(vertical: 5),
                     padding: EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: index % 2 == 0
-                          ? Color(0xFFD7AEF3) // Purple for received messages
-                          : Color(0xFFFFB0FE), // Pink for sent messages
+                      color: isSentByUser
+                          ? Color(0xFFFFB0FE) // Pink for sent messages
+                          : Color(0xFFD7AEF3), // Purple for received messages
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      _messages[index],
+                      "${_messages[index]["sender"]}: ${_messages[index]["message"]}",
                       style: TextStyle(color: Colors.white),
                     ),
                   ),

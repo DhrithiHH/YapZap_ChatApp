@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
@@ -24,16 +23,17 @@ class _CallScreenState extends State<CallScreen> {
   late RTCVideoRenderer _remoteRenderer;
   late RTCPeerConnection _peerConnection;
   late MediaStream _localStream;
-  late Timer _callTimer;
+  bool _isMuted = false;
+  bool _isVideoEnabled = true;
 
   @override
   void initState() {
-     super.initState();
+    super.initState();
     _initializeRenderers();
-    _connectToSignaling();
-
-    // Start timer for call duration
-    _startCallTimer();
+    if (!widget.isIncoming) {
+      _connectToSignaling();
+      _startCall();
+    }
   }
 
   @override
@@ -43,11 +43,7 @@ class _CallScreenState extends State<CallScreen> {
     _peerConnection.close();
     super.dispose();
   }
-void _startCallTimer() {
-     _callTimer = Timer(Duration(seconds: 30), () {
-      _endCall(); // Automatically end the call after 30 seconds
-    });
-  }
+
   Future<void> _initializeRenderers() async {
     _localRenderer = RTCVideoRenderer();
     _remoteRenderer = RTCVideoRenderer();
@@ -55,7 +51,6 @@ void _startCallTimer() {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
 
-    // Get local media
     await _initLocalMedia();
   }
 
@@ -85,7 +80,6 @@ void _startCallTimer() {
 
     _peerConnection = await createPeerConnection(config);
 
-    // Add local tracks to the peer connection
     _localStream.getTracks().forEach((track) {
       _peerConnection.addTrack(track, _localStream);
     });
@@ -121,109 +115,63 @@ void _startCallTimer() {
     });
   }
 
- void _acceptCall(Map<String, dynamic>? offer) async {
-  if (offer == null || offer.isEmpty || offer['sdp'] == null || offer['type'] == null) {
-    print("Invalid or empty offer received");
-    widget.socket.emit('error', {
-      'message': 'Invalid offer received',
-      'from': widget.callData['to'], // Receiver
-      'to': widget.callData['from'], // Original caller
+  void _acceptCall(Map<String, dynamic>? offer) async {
+    if (offer == null || offer['sdp'] == null || offer['type'] == null) {
+      widget.socket.emit('error', {'message': 'Invalid offer received'});
+      return;
+    }
+
+    await _peerConnection.setRemoteDescription(RTCSessionDescription(offer['sdp'], offer['type']));
+    final answer = await _peerConnection.createAnswer();
+    await _peerConnection.setLocalDescription(answer);
+
+    widget.socket.emit('answer', {
+      'answer': answer.toMap(),
+      'from': widget.callData['to'],
+      'to': widget.callData['from'],
     });
-    return;
   }
 
-  await _peerConnection.setRemoteDescription(RTCSessionDescription(offer['sdp'], offer['type']));
-  final answer = await _peerConnection.createAnswer();
-  await _peerConnection.setLocalDescription(answer);
-
-  widget.socket.emit('answer', {
-    'answer': answer.toMap(),
-    'from': widget.callData['to'], // Receiver sends back
-    'to': widget.callData['from'], // Original caller
-  });
-}
+  void _rejectCall() {
+    widget.socket.emit('reject-call', {
+      'from': widget.callData['to'],
+      'to': widget.callData['from'],
+    });
+    Navigator.pop(context);
+  }
 
   void _endCall() {
-  if (_callTimer.isActive) _callTimer.cancel();
+    widget.socket.emit('end-call', {
+      'from': widget.callData['from'],
+      'to': widget.callData['to'],
+    });
+    Navigator.pop(context);
+  }
 
-  // Emit end-call signal
-  widget.socket.emit('end-call', {
-    'from': widget.callData['from'],
-    'to': widget.callData['to'],
-  });
+  void _toggleMute() {
+    setState(() {
+      _isMuted = !_isMuted;
+    });
+    _localStream.getAudioTracks().forEach((track) {
+      track.enabled = !_isMuted;
+    });
+  }
 
-  // Cleanup connections
-  _peerConnection.close();
-  _peerConnection.dispose();
-
-  _localStream.getTracks().forEach((track) {
-    track.stop(); // Stops audio/video tracks
-  });
-  _localStream.dispose();
-
-  _localRenderer.dispose();
-  _remoteRenderer.dispose();
-
-  // Remove socket listeners
-  widget.socket.off('offer');
-  widget.socket.off('answer');
-  widget.socket.off('ice-candidate');
-  widget.socket.off('end-call');
-
-  Navigator.pop(context); // Return to the previous screen
-}
-
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: RTCVideoView(_remoteRenderer),
-            ),
-            Positioned(
-              top: 20,
-              right: 20,
-              width: 100,
-              height: 150,
-              child: RTCVideoView(
-                _localRenderer,
-                mirror: true,
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.call_end, color: Colors.red),
-                    onPressed: _endCall,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _toggleVideo() {
+    setState(() {
+      _isVideoEnabled = !_isVideoEnabled;
+    });
+    _localStream.getVideoTracks().forEach((track) {
+      track.enabled = _isVideoEnabled;
+    });
   }
 
   void _connectToSignaling() {
     widget.socket.on('offer', (data) {
-    print("Received offer data: $data");  // Check what is being received
-    if (data != null && data['to'] == widget.callData['from']) {
-    _acceptCall(data['offer']);
-  } else {
-    // Handle the case where data is invalid
-    widget.socket.emit('error',{
-      'message' : "null",
+      if (data['to'] == widget.callData['from']) {
+        _acceptCall(data['offer']);
+      }
     });
-  }
-});
 
     widget.socket.on('answer', (data) {
       if (data['to'] == widget.callData['from']) {
@@ -238,7 +186,7 @@ void _startCallTimer() {
           data['candidate']['sdpMid'],
           data['candidate']['sdpMLineIndex'],
         );
-        _peerConnection.addCandidate(candidate); // Updated method
+        _peerConnection.addCandidate(candidate);
       }
     });
 
@@ -247,13 +195,71 @@ void _startCallTimer() {
         _endCall();
       }
     });
-
-    if (widget.isIncoming) {
-      _acceptCall(widget.callData['offer']);
-    } else {
-      _startCall();
-    }
   }
-  
-  
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: widget.isIncoming
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text("Incoming Call", style: TextStyle(color: Colors.white)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.call, color: Colors.green, size: 40),
+                          onPressed: () {
+                            _connectToSignaling();
+                          },
+                        ),
+                        SizedBox(width: 20),
+                        IconButton(
+                          icon: Icon(Icons.call_end, color: Colors.red, size: 40),
+                          onPressed: _rejectCall,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              )
+            : Stack(
+                children: [
+                  Positioned.fill(child: RTCVideoView(_remoteRenderer)),
+                  Positioned(
+                    top: 20,
+                    right: 20,
+                    width: 100,
+                    height: 150,
+                    child: RTCVideoView(_localRenderer, mirror: true),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: Colors.white),
+                          onPressed: _toggleMute,
+                        ),
+                        IconButton(
+                          icon: Icon(_isVideoEnabled ? Icons.videocam : Icons.videocam_off, color: Colors.white),
+                          onPressed: _toggleVideo,
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.call_end, color: Colors.red),
+                          onPressed: _endCall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
 }

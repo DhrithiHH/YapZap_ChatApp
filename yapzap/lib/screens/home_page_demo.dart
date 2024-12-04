@@ -80,7 +80,7 @@ class _HomePageDemoState extends State<HomePageDemo>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CallScreen(callData: callData, socket: socket),
+        builder: (context) => CallPage(data: callData, socket: socket),
       ),
     );
   }
@@ -91,7 +91,7 @@ class _HomePageDemoState extends State<HomePageDemo>
       context,
       MaterialPageRoute(
         builder: (context) =>
-            CallScreen(callData: data, socket: socket, isIncoming: true),
+            CallPage(data: data, socket: socket, incoming: true),
       ),
     );
   }

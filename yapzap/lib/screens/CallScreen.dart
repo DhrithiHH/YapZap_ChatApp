@@ -121,17 +121,27 @@ void _startCallTimer() {
     });
   }
 
-  void _acceptCall(Map<String, dynamic> offer) async {
-    await _peerConnection.setRemoteDescription(RTCSessionDescription(offer['sdp'], offer['type']));
-    final answer = await _peerConnection.createAnswer();
-    await _peerConnection.setLocalDescription(answer);
-
-    widget.socket.emit('answer', {
-      'answer': answer.toMap(),
-      'from': widget.callData['to'], // Receiver sends back
+ void _acceptCall(Map<String, dynamic>? offer) async {
+  if (offer == null || offer.isEmpty || offer['sdp'] == null || offer['type'] == null) {
+    print("Invalid or empty offer received");
+    widget.socket.emit('error', {
+      'message': 'Invalid offer received',
+      'from': widget.callData['to'], // Receiver
       'to': widget.callData['from'], // Original caller
     });
+    return;
   }
+
+  await _peerConnection.setRemoteDescription(RTCSessionDescription(offer['sdp'], offer['type']));
+  final answer = await _peerConnection.createAnswer();
+  await _peerConnection.setLocalDescription(answer);
+
+  widget.socket.emit('answer', {
+    'answer': answer.toMap(),
+    'from': widget.callData['to'], // Receiver sends back
+    'to': widget.callData['from'], // Original caller
+  });
+}
 
   void _endCall() {
   if (_callTimer.isActive) _callTimer.cancel();

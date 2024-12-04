@@ -69,8 +69,8 @@ class _HomePageDemoState extends State<HomePageDemo>
   void _initiateCall(String peerId, String callType) {
     final callData = {
       'from': widget.userId,
-      'to': peerId,
       'type': callType,
+      'to': peerId,
     };
 
     // Notify peer about the call

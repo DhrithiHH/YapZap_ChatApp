@@ -50,6 +50,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _messageController.dispose();
     widget.socket.off('vanish_mode_update');
     super.dispose();
   }
@@ -67,22 +68,36 @@ class _ChatScreenState extends State<ChatScreen> {
           .get();
 
       if (docSnapshot.exists) {
+        // Check if the 'isVanishMode' field exists
+        bool isVanishMode = docSnapshot['isVanishMode'] ?? false;  // Default to false if field is missing
         setState(() {
-          _isVanishMode = docSnapshot['isVanishMode'] ?? false;
+          _isVanishMode = isVanishMode;
         });
 
         if (_isVanishMode) {
           setState(() {
-            _messages.clear();
+            _messages.clear(); // Clear messages if vanish mode is on
           });
         }
+      } else {
+        // If document does not exist, initialize the chat with vanish mode set to false
+        await FirebaseFirestore.instance
+            .collection('messages')
+            .doc(chatId)
+            .set({
+          'isVanishMode': false, // Default vanish mode to false
+        }, SetOptions(merge: true));
+
+        setState(() {
+          _isVanishMode = false;
+        });
       }
     } catch (e) {
       debugPrint('Error fetching vanish mode status: $e');
+      _showErrorMessage('Failed to fetch vanish mode status. Please try again.');
     }
   }
 
-  // Fetch previous messages if vanish mode is off
   Future<void> _fetchPreviousMessages() async {
     if (_isVanishMode) return; // Skip fetching messages if vanish mode is active
 
@@ -104,13 +119,14 @@ class _ChatScreenState extends State<ChatScreen> {
             'from': doc['from'],
             'message': doc['message'],
             'isStarred': doc['isStarred'] ?? false,
-            'messageId': doc.id,  // Use Firestore doc ID as messageId
+            'messageId': doc.id,
             'timestamp': doc['timestamp'],
           };
         }).toList());
       });
     } catch (e) {
       debugPrint('Error fetching previous messages: $e');
+      _showErrorMessage('Failed to load previous messages. Please try again.');
     }
   }
 
@@ -146,6 +162,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       debugPrint('Error toggling vanish mode: $e');
+      _showErrorMessage('Failed to toggle vanish mode. Please try again.');
     }
   }
 
@@ -162,7 +179,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final messageObject = {
       'from': widget.userId,
       'message': message,
-      'timestamp': FieldValue.serverTimestamp(),
+      'timestamp': FieldValue.serverTimestamp(), // Use timestamp as messageId
       'isStarred': false,
     };
 
@@ -190,12 +207,13 @@ class _ChatScreenState extends State<ChatScreen> {
           'from': widget.userId,
           'message': message,
           'isStarred': false,
-          'messageId': DateTime.now().millisecondsSinceEpoch.toString(), // Use timestamp as message ID
+          'messageId': DateTime.now().millisecondsSinceEpoch.toString(), // Timestamp as messageId
         });
         _messageController.clear();
       });
     } catch (e) {
       debugPrint('Error sending message: $e');
+      _showErrorMessage('Failed to send message. Please try again.');
     } finally {
       setState(() => _isSending = false);
     }
@@ -214,9 +232,21 @@ class _ChatScreenState extends State<ChatScreen> {
           .collection('chatMessages')
           .doc(messageId)
           .delete();
+      
+      setState(() {
+        _messages.removeWhere((message) => message['messageId'] == messageId);
+      });
     } catch (e) {
       debugPrint('Error deleting message: $e');
+      _showErrorMessage('Failed to delete message. Please try again.');
     }
+  }
+
+  // Show error message to user
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   // Show message options popup
@@ -264,43 +294,41 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              reverse: true,
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return GestureDetector(
-                  onLongPress: () {
-                    _showMessageOptions(context, message['messageId']);
-                  },
-                  child: Align(
-                    alignment: message['from'] == widget.userId
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                      decoration: BoxDecoration(
-                        color: message['from'] == widget.userId
-                            ? Colors.blue
-                            : Colors.grey[300],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        message['message'],
-                        style: TextStyle(
-                          color: message['from'] == widget.userId
-                              ? Colors.white
-                              : Colors.black,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
+  child: ListView.builder(
+    reverse: true,
+    itemCount: _messages.length,
+    itemBuilder: (context, index) {
+      final message = _messages[index];
+      return GestureDetector(
+        onLongPress: () {
+          _showMessageOptions(context, message['messageId']);
+        },
+        child: Align(
+          alignment: message['from'] == widget.userId
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Material(
+              color: message['from'] == widget.userId
+                  ? Colors.blueAccent  // Color for sent messages
+                  : Colors.grey,      // Color for received messages
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Text(
+                  message['message'],
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
             ),
           ),
-          Padding(
+        ),
+      );
+    },
+  ),
+),
+Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
@@ -308,8 +336,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: _messageController,
                     decoration: const InputDecoration(
-                      hintText: 'Type a message...',
+                      hintText: 'Enter message...',
                     ),
+                    onSubmitted: _sendMessage,
                   ),
                 ),
                 IconButton(
@@ -317,7 +346,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? const CircularProgressIndicator()
                       : const Icon(Icons.send),
                   onPressed: () {
-                    _sendMessage(_messageController.text);
+                    if (!_isSending) {
+                      _sendMessage(_messageController.text.trim());
+                    }
                   },
                 ),
               ],

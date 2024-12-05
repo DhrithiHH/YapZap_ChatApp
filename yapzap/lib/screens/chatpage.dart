@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:yapzap/screens/CallScreen.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class ChatScreen extends StatefulWidget {
   final String userId;
@@ -29,11 +28,20 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
 
-    // Listen for incoming messages
-    widget.socket.on('message', _onMessageReceived);
+    // Listen for vanish mode status updates from the server
+    widget.socket.on('vanish_mode_update', (data) {
+      if (data['userIds'].contains(widget.userId) && data['userIds'].contains(widget.peerId)) {
+        setState(() {
+          _isVanishMode = data['isVanishMode'];
+        });
 
-    // Listen for incoming calls
-    widget.socket.on('call', _handleIncomingCall);
+        if (_isVanishMode) {
+          setState(() {
+            _messages.clear(); // Clear messages if vanish mode is on
+          });
+        }
+      }
+    });
 
     // Fetch vanish mode status and previous messages
     _fetchVanishModeStatus();
@@ -42,8 +50,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    // Remove socket listeners
-    widget.socket.off('message', _onMessageReceived);
+    widget.socket.off('vanish_mode_update');
     super.dispose();
   }
 
@@ -65,7 +72,6 @@ class _ChatScreenState extends State<ChatScreen> {
         });
 
         if (_isVanishMode) {
-          // Clear previous messages if vanish mode is enabled
           setState(() {
             _messages.clear();
           });
@@ -98,26 +104,13 @@ class _ChatScreenState extends State<ChatScreen> {
             'from': doc['from'],
             'message': doc['message'],
             'isStarred': doc['isStarred'] ?? false,
+            'messageId': doc.id,  // Use Firestore doc ID as messageId
+            'timestamp': doc['timestamp'],
           };
         }).toList());
       });
     } catch (e) {
       debugPrint('Error fetching previous messages: $e');
-    }
-  }
-
-  // Handle incoming message
-  void _onMessageReceived(dynamic data) {
-    if (_isVanishMode) return; // Do not show message if vanish mode is on
-
-    if (data['from'] != widget.userId) {
-      setState(() {
-        _messages.insert(0, {
-          'from': data['from'],
-          'message': data['message'],
-          'isStarred': false,
-        });
-      });
     }
   }
 
@@ -128,6 +121,7 @@ class _ChatScreenState extends State<ChatScreen> {
     String chatId = '${users[0]}_${users[1]}';
 
     try {
+      // Toggle vanish mode in Firestore
       await FirebaseFirestore.instance
           .collection('messages')
           .doc(chatId)
@@ -135,13 +129,19 @@ class _ChatScreenState extends State<ChatScreen> {
             'isVanishMode': !_isVanishMode, // Toggle vanish mode
           }, SetOptions(merge: true));
 
+      // Emit vanish mode toggle via socket to the other user
+      widget.socket.emit('vanish_mode_update', {
+        'userIds': [widget.userId, widget.peerId],
+        'isVanishMode': !_isVanishMode,
+      });
+
       setState(() {
         _isVanishMode = !_isVanishMode;
       });
 
       if (_isVanishMode) {
         setState(() {
-          _messages.clear(); // Clear messages on Vanish Mode activation
+          _messages.clear(); // Clear messages if vanish mode is on
         });
       }
     } catch (e) {
@@ -190,6 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'from': widget.userId,
           'message': message,
           'isStarred': false,
+          'messageId': DateTime.now().millisecondsSinceEpoch.toString(), // Use timestamp as message ID
         });
         _messageController.clear();
       });
@@ -200,64 +201,49 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // Mark or unmark a message as starred
-  Future<void> _toggleStarMessage(int index) async {
-    final message = _messages[index];
-    final isStarred = !message['isStarred'];
+  // Delete message from Firestore
+  Future<void> _deleteMessage(String messageId) async {
+    List<String> users = [widget.userId, widget.peerId];
+    users.sort();
+    String chatId = '${users[0]}_${users[1]}';
 
-    setState(() {
-      _messages[index]['isStarred'] = isStarred;
-    });
-
-    // Update Firestore if vanish mode is off
-    if (!_isVanishMode) {
-      List<String> users = [widget.userId, widget.peerId];
-      users.sort();
-      String chatId = '${users[0]}_${users[1]}';
-
-      try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('messages')
-            .doc(chatId)
-            .collection('chatMessages')
-            .where('message', isEqualTo: message['message'])
-            .limit(1)
-            .get();
-
-        if (snapshot.docs.isNotEmpty) {
-          await snapshot.docs.first.reference.update({'isStarred': isStarred});
-        }
-      } catch (e) {
-        debugPrint('Error toggling star status: $e');
-      }
+    try {
+      await FirebaseFirestore.instance
+          .collection('messages')
+          .doc(chatId)
+          .collection('chatMessages')
+          .doc(messageId)
+          .delete();
+    } catch (e) {
+      debugPrint('Error deleting message: $e');
     }
   }
 
-  // Initiate a call
-  void _initiateCall(String peerId, String callType) {
-    final callData = {
-      'from': widget.userId,
-      'to': peerId,
-      'type': callType,
-    };
-
-    widget.socket.emit('call', callData);
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CallPage(data: callData, socket: widget.socket),
-      ),
-    );
-  }
-
-  // Handle incoming call
-  void _handleIncomingCall(dynamic data) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CallPage(data: data, socket: widget.socket, incoming: true),
-      ),
+  // Show message options popup
+  void _showMessageOptions(BuildContext context, String messageId) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Message Options'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _deleteMessage(messageId);
+                Navigator.pop(context);
+              },
+              child: const Text('Delete'),
+            ),
+            TextButton(
+              onPressed: () {
+                // Implement Star functionality here
+                Navigator.pop(context);
+              },
+              child: const Text('Star'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -273,12 +259,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             onPressed: _toggleVanishMode,
           ),
-          IconButton(
-            icon: const Icon(Icons.call),
-            onPressed: () {
-              _initiateCall(widget.peerId, 'video');
-            },
-          ),
         ],
       ),
       body: Column(
@@ -290,32 +270,29 @@ class _ChatScreenState extends State<ChatScreen> {
               itemBuilder: (context, index) {
                 final message = _messages[index];
                 return GestureDetector(
-                  onLongPress: () => _toggleStarMessage(index),
+                  onLongPress: () {
+                    _showMessageOptions(context, message['messageId']);
+                  },
                   child: Align(
                     alignment: message['from'] == widget.userId
                         ? Alignment.centerRight
                         : Alignment.centerLeft,
                     child: Container(
                       margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
                       decoration: BoxDecoration(
                         color: message['from'] == widget.userId
-                            ? Colors.blue[200]
+                            ? Colors.blue
                             : Colors.grey[300],
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              message['message'],
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          if (message['isStarred'])
-                            const Icon(Icons.star, color: Colors.yellow),
-                        ],
+                      child: Text(
+                        message['message'],
+                        style: TextStyle(
+                          color: message['from'] == widget.userId
+                              ? Colors.white
+                              : Colors.black,
+                        ),
                       ),
                     ),
                   ),
@@ -331,21 +308,17 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: _messageController,
                     decoration: const InputDecoration(
-                      hintText: 'Type a message',
-                      border: OutlineInputBorder(),
+                      hintText: 'Type a message...',
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
                 IconButton(
-                  icon: Icon(
-                    _isSending ? Icons.hourglass_empty : Icons.send,
-                  ),
-                  onPressed: _isSending
-                      ? null
-                      : () {
-                          _sendMessage(_messageController.text);
-                        },
+                  icon: _isSending
+                      ? const CircularProgressIndicator()
+                      : const Icon(Icons.send),
+                  onPressed: () {
+                    _sendMessage(_messageController.text);
+                  },
                 ),
               ],
             ),

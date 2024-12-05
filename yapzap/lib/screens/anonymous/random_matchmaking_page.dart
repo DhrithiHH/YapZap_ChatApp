@@ -20,7 +20,7 @@ class _RandomMatchmakingPageState extends State<RandomMatchmakingPage> {
   }
 
   void connectToSocket() {
-    socket = IO.io('http://your-backend-url', <String, dynamic>{
+    socket = IO.io('http://server-ouzf.onrender.com', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
     });

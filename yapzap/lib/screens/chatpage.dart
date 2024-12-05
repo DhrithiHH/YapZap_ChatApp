@@ -97,6 +97,7 @@ class _ChatScreenState extends State<ChatScreen> {
           return {
             'from': doc['from'],
             'message': doc['message'],
+            'isStarred': doc['isStarred'] ?? false,
           };
         }).toList());
       });
@@ -114,6 +115,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.insert(0, {
           'from': data['from'],
           'message': data['message'],
+          'isStarred': false,
         });
       });
     }
@@ -161,6 +163,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'from': widget.userId,
       'message': message,
       'timestamp': FieldValue.serverTimestamp(),
+      'isStarred': false,
     };
 
     try {
@@ -182,17 +185,51 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       // Add message to the local state only if vanish mode is off
-        setState(() {
-          _messages.insert(0, {
-            'from': widget.userId,
-            'message': message,
-          });
-          _messageController.clear();
+      setState(() {
+        _messages.insert(0, {
+          'from': widget.userId,
+          'message': message,
+          'isStarred': false,
         });
+        _messageController.clear();
+      });
     } catch (e) {
       debugPrint('Error sending message: $e');
     } finally {
       setState(() => _isSending = false);
+    }
+  }
+
+  // Mark or unmark a message as starred
+  Future<void> _toggleStarMessage(int index) async {
+    final message = _messages[index];
+    final isStarred = !message['isStarred'];
+
+    setState(() {
+      _messages[index]['isStarred'] = isStarred;
+    });
+
+    // Update Firestore if vanish mode is off
+    if (!_isVanishMode) {
+      List<String> users = [widget.userId, widget.peerId];
+      users.sort();
+      String chatId = '${users[0]}_${users[1]}';
+
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('messages')
+            .doc(chatId)
+            .collection('chatMessages')
+            .where('message', isEqualTo: message['message'])
+            .limit(1)
+            .get();
+
+        if (snapshot.docs.isNotEmpty) {
+          await snapshot.docs.first.reference.update({'isStarred': isStarred});
+        }
+      } catch (e) {
+        debugPrint('Error toggling star status: $e');
+      }
     }
   }
 
@@ -252,22 +289,34 @@ class _ChatScreenState extends State<ChatScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                return Align(
-                  alignment: message['from'] == widget.userId
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: message['from'] == widget.userId
-                          ? Colors.blue[200]
-                          : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      message['message'],
-                      style: const TextStyle(fontSize: 16),
+                return GestureDetector(
+                  onLongPress: () => _toggleStarMessage(index),
+                  child: Align(
+                    alignment: message['from'] == widget.userId
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: message['from'] == widget.userId
+                            ? Colors.blue[200]
+                            : Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              message['message'],
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          if (message['isStarred'])
+                            const Icon(Icons.star, color: Colors.yellow),
+                        ],
+                      ),
                     ),
                   ),
                 );

@@ -4,10 +4,10 @@ class AnonymousChatLobbyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Anonymous Chat Lobby"),
-        backgroundColor: Color(0xFFD7AEF3), // Purple color from theme
-      ),
+      // appBar: AppBar(
+      //   // title: Text("Anonymous Chat Lobby"),
+      //   // backgroundColor: Color(0xFFD7AEF3), // Purple color from theme
+      // ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -22,7 +22,7 @@ class AnonymousChatLobbyPage extends StatelessWidget {
             SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/randomMatchmaking');
+                Navigator.pushNamed(context, '/RandomMatchmakingPage');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF7DD2B3), // Green color from theme

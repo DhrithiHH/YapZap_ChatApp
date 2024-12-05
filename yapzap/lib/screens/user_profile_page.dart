@@ -1,93 +1,115 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class UserProfilePage extends StatelessWidget {
-  const UserProfilePage({Key? key}) : super(key: key);
+  final String userId;
+  const UserProfilePage({Key? key, required this.userId}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              // Profile Picture Section
-              Stack(
-                alignment: Alignment.center,
+      body: FutureBuilder<DocumentSnapshot>(
+        future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          }
+
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            return const Center(child: Text("User not found"));
+          }
+
+          var userData = snapshot.data!.data() as Map<String, dynamic>;
+          String? email = userData['email'];
+          String? username = userData['username'];
+          String? bio = userData['bio'];
+          String? profilePic = userData['profilePic'];
+
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.grey.shade200,
-                    backgroundImage: const AssetImage(
-                        'assets/images/profile_placeholder.png'),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: CircleAvatar(
-                      radius: 20,
-                      backgroundColor: const Color(0xFFFFB0FE), // Pink Button
-                      child: IconButton(
-                        icon: const Icon(Icons.camera_alt, color: Colors.white),
-                        onPressed: () {
-                          _showPhotoOptions(context);
-                        },
-                      ),
+                  // Profile Picture Section
+                  Center(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 60,
+                          backgroundColor: Colors.grey.shade200,
+                          backgroundImage: profilePic != null && profilePic.isNotEmpty
+                              ? NetworkImage(profilePic) as ImageProvider
+                              : const AssetImage('assets/images/yapzap_logo.png'),
+                        ),
+                        if (profilePic == null || profilePic.isEmpty) ...[
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: const Color(0xFFFFB0FE), // Pink Button
+                              child: IconButton(
+                                icon: const Icon(Icons.camera_alt, color: Colors.white),
+                                onPressed: () {
+                                  _showPhotoOptions(context);
+                                },
+                              ),
+                            ),
+                          ),
+                        ]
+                      ],
                     ),
+                  ),
+                  // User Info Section
+                  UserInfoField(label: "Name", value: userData['username'] ?? "Not Available"),
+                  const Divider(height: 30, thickness: 1),
+                  UserInfoField(label: "Username", value: username ?? "Not Available"),
+                  const Divider(height: 30, thickness: 1),
+                  UserInfoField(label: "About", value: bio ?? "Not Available"),
+                  const Divider(height: 30, thickness: 1),
+                  UserInfoField(label: "Email ID", value: email ?? "Not Available"),
+                  const Divider(height: 30, thickness: 1),
+
+                  // Settings Section
+                  const SizedBox(height: 30),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "Settings",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  ListTile(
+                    leading: const Icon(Icons.account_circle, color: Colors.black),
+                    title: const Text("Account"),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.pushNamed(context, '/account_settings');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.privacy_tip, color: Colors.black),
+                    title: const Text("Privacy"),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.pushNamed(context, '/privacy_settings');
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 30),
-
-              // User Info Section
-              const UserInfoField(label: "Name", value: "John Doe"),
-              const Divider(height: 30, thickness: 1),
-              const UserInfoField(label: "Username", value: "@john_doe"),
-              const Divider(height: 30, thickness: 1),
-              const UserInfoField(
-                  label: "About", value: "Flutter Developer at YapZap"),
-              const Divider(height: 30, thickness: 1),
-              const UserInfoField(
-                  label: "Email ID", value: "john.doe@example.com"),
-              const Divider(height: 30, thickness: 1),
-
-              // Settings Section
-              const SizedBox(height: 30),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "Settings",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 15),
-              ListTile(
-                leading: const Icon(Icons.account_circle, color: Colors.black),
-                title: const Text("Account"),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  Navigator.pushNamed(context, '/account_settings');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.privacy_tip, color: Colors.black),
-                title: const Text("Privacy"),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  Navigator.pushNamed(context, '/privacy_settings');
-                },
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -106,23 +128,31 @@ class UserProfilePage extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.camera_alt),
                 title: const Text("Take Photo"),
-                onTap: () {
-                  Navigator.pop(context); // Placeholder for functionality
+                onTap: () async {
+                  XFile? image = await _pickImage(ImageSource.camera);
+                  if (image != null) {
+                    _uploadImage(image);
+                  }
+                  Navigator.pop(context);
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.photo),
                 title: const Text("Choose from Gallery"),
-                onTap: () {
-                  Navigator.pop(context); // Placeholder for functionality
+                onTap: () async {
+                  XFile? image = await _pickImage(ImageSource.gallery);
+                  if (image != null) {
+                    _uploadImage(image);
+                  }
+                  Navigator.pop(context);
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text("Remove Photo",
-                    style: TextStyle(color: Colors.red)),
+                title: const Text("Remove Photo", style: TextStyle(color: Colors.red)),
                 onTap: () {
-                  Navigator.pop(context); // Placeholder for functionality
+                  _removeProfilePic();
+                  Navigator.pop(context);
                 },
               ),
             ],
@@ -130,6 +160,53 @@ class UserProfilePage extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<XFile?> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    return await picker.pickImage(source: source);
+  }
+
+  // Upload image to Firebase Storage and update Firestore
+  Future<void> _uploadImage(XFile image) async {
+    try {
+      // Create a reference to Firebase Storage
+      String fileName = 'profile_pics/${userId}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
+      await storageRef.putFile(File(image.path));
+
+      // Get the download URL of the uploaded image
+      String downloadUrl = await storageRef.getDownloadURL();
+
+      // Update Firestore with the image URL
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'profilePic': downloadUrl,
+      });
+    } catch (e) {
+      print("Error uploading image: $e");
+    }
+  }
+
+  // Remove profile picture from Firebase Storage and Firestore
+  Future<void> _removeProfilePic() async {
+    try {
+      // Get the current profile picture URL
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+      String? currentPic = userDoc['profilePic'];
+
+      if (currentPic != null && currentPic.isNotEmpty) {
+        // Delete the image from Firebase Storage
+        Reference storageRef = FirebaseStorage.instance.refFromURL(currentPic);
+        await storageRef.delete();
+
+        // Remove the profilePic field from Firestore
+        await FirebaseFirestore.instance.collection('users').doc(userId).update({
+          'profilePic': FieldValue.delete(),
+        });
+      }
+    } catch (e) {
+      print("Error removing photo: $e");
+    }
   }
 }
 

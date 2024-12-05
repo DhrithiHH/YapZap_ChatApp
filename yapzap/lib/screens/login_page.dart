@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'dart:math';
+import 'package:yapzap/screens/home.dart';
 
 class LoginPage extends StatefulWidget {
   @override
-  _LoginScreenDemoState createState() => _LoginScreenDemoState();
+  _LoginPageState createState() => _LoginPageState();
 }
 
-class _LoginScreenDemoState extends State<LoginPage>
-    with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -40,37 +39,25 @@ class _LoginScreenDemoState extends State<LoginPage>
     super.dispose();
   }
 
-  // Helper function to check if input is an email
   bool isEmail(String input) {
-    final emailRegex =
-        RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     return emailRegex.hasMatch(input);
   }
 
-  // Function to fetch email by userId
   Future<String?> _getEmailByUserId(String userId) async {
     try {
-      final docSnapshot =
-          await _firestore.collection('users').doc(userId).get();
+      final docSnapshot = await _firestore.collection('users').doc(userId).get();
       if (docSnapshot.exists) {
-        final email = docSnapshot.data()?['email']; // Fetch the email
-        if (email != null) {
-          return email; // Return email if it exists
-        } else {
-          print('Email field is missing in the document');
-          return null; // Return null if email is missing
-        }
+        return docSnapshot.data()?['email'];
       } else {
-        print('User document does not exist');
-        return null; // Return null if document doesn't exist
+        return null;
       }
     } catch (e) {
-      print('Error fetching email: ${e.toString()}'); // Detailed error logging
-      return null; // Return null in case of any exception
+      print('Error fetching email: $e');
+      return null;
     }
   }
 
-  // Function to fetch userId by email
   Future<String?> _getUserIdByEmail(String email) async {
     try {
       final querySnapshot = await _firestore
@@ -85,7 +72,6 @@ class _LoginScreenDemoState extends State<LoginPage>
     }
   }
 
-  // Login function
   Future<void> _login() async {
     try {
       final input = _emailController.text.trim();
@@ -113,18 +99,24 @@ class _LoginScreenDemoState extends State<LoginPage>
         email = fetchedEmail;
       }
 
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      // Firebase Auth login
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
 
+      // Fetch the userId by querying Firestore
       final userId = await _getUserIdByEmail(email);
 
       if (userId != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Login Successful')),
         );
-        Navigator.pushReplacementNamed(context, '/home', arguments: userId);
+
+        // Navigate to the homepage, passing the userId
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => Home(userId: userId),
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No userId found for the provided email.')),
@@ -137,8 +129,9 @@ class _LoginScreenDemoState extends State<LoginPage>
       } else if (e.code == 'wrong-password') {
         message = 'Incorrect password.';
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Unexpected error: $e')),
@@ -164,14 +157,7 @@ class _LoginScreenDemoState extends State<LoginPage>
                     Container(
                       padding: const EdgeInsets.all(20.0),
                       decoration: BoxDecoration(
-                        // color: const Color(0xFFF7F7F9),
                         borderRadius: BorderRadius.circular(12),
-                        // boxShadow: [
-                        //   // BoxShadow(
-                        //   //   color: Colors.black.withOpacity(0.1),
-                        //   //   blurRadius: 10.0,
-                        //   // ),
-                        // ],
                       ),
                       child: const Text(
                         'Welcome to YapZap!',
@@ -214,8 +200,7 @@ class _LoginScreenDemoState extends State<LoginPage>
                       },
                       child: const Text(
                         'Don\'t have an account? Register here',
-                        style:
-                            TextStyle(color: Color.fromARGB(255, 59, 10, 87)),
+                        style: TextStyle(color: Color.fromARGB(255, 59, 10, 87)),
                       ),
                     ),
                   ],
@@ -229,7 +214,6 @@ class _LoginScreenDemoState extends State<LoginPage>
   }
 }
 
-// Bubbled Background
 class AnimatedBackground extends StatelessWidget {
   const AnimatedBackground({Key? key}) : super(key: key);
 
@@ -243,7 +227,6 @@ class AnimatedBackground extends StatelessWidget {
   }
 }
 
-// TextField with Bubble Background
 class BubbleTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
@@ -278,8 +261,7 @@ class BubbleTextField extends StatelessWidget {
         obscureText: isPassword,
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle:
-              const TextStyle(color: Color(0xFFCACBCF)), // Grey placeholder
+          hintStyle: const TextStyle(color: Color(0xFFCACBCF)), // Grey placeholder
           prefixIcon: Icon(icon, color: Colors.black),
           border: InputBorder.none,
         ),
@@ -288,7 +270,6 @@ class BubbleTextField extends StatelessWidget {
   }
 }
 
-// Purple Button for Actions
 class PurpleButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
@@ -306,8 +287,7 @@ class PurpleButton extends StatelessWidget {
       onPressed: onPressed,
       child: Text(
         text,
-        style:
-            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       ),
     );
   }

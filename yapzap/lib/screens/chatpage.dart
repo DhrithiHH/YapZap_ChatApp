@@ -3,8 +3,6 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:yapzap/screens/CallScreen.dart';
 
-// import 'call_screen.dart';
-
 class ChatScreen extends StatefulWidget {
   final String userId;
   final String peerId;
@@ -25,20 +23,22 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final List<Map<String, dynamic>> _messages = [];
   bool _isSending = false;
+  bool _isVanishMode = false;
 
   @override
   void initState() {
-  super.initState();
+    super.initState();
 
-  // Listen for incoming messages
-  widget.socket.on('message', _onMessageReceived);
+    // Listen for incoming messages
+    widget.socket.on('message', _onMessageReceived);
 
-  // Listen for incoming calls
-  widget.socket.on('call', _handleIncomingCall);
+    // Listen for incoming calls
+    widget.socket.on('call', _handleIncomingCall);
 
-  // Fetch previous messages
-  _fetchPreviousMessages();
-}
+    // Fetch vanish mode status and previous messages
+    _fetchVanishModeStatus();
+    _fetchPreviousMessages();
+  }
 
   @override
   void dispose() {
@@ -47,9 +47,41 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchPreviousMessages() async {
+  // Fetch Vanish Mode status
+  Future<void> _fetchVanishModeStatus() async {
     List<String> users = [widget.userId, widget.peerId];
-    users.sort(); // Ensure consistent chatId generation
+    users.sort();
+    String chatId = '${users[0]}_${users[1]}';
+
+    try {
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection('messages')
+          .doc(chatId)
+          .get();
+
+      if (docSnapshot.exists) {
+        setState(() {
+          _isVanishMode = docSnapshot['isVanishMode'] ?? false;
+        });
+
+        if (_isVanishMode) {
+          // Clear previous messages if vanish mode is enabled
+          setState(() {
+            _messages.clear();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching vanish mode status: $e');
+    }
+  }
+
+  // Fetch previous messages if vanish mode is off
+  Future<void> _fetchPreviousMessages() async {
+    if (_isVanishMode) return; // Skip fetching messages if vanish mode is active
+
+    List<String> users = [widget.userId, widget.peerId];
+    users.sort();
     String chatId = '${users[0]}_${users[1]}';
 
     try {
@@ -73,7 +105,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // Handle incoming message
   void _onMessageReceived(dynamic data) {
+    if (_isVanishMode) return; // Do not show message if vanish mode is on
+
     if (data['from'] != widget.userId) {
       setState(() {
         _messages.insert(0, {
@@ -84,6 +119,35 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // Toggle vanish mode
+  Future<void> _toggleVanishMode() async {
+    List<String> users = [widget.userId, widget.peerId];
+    users.sort();
+    String chatId = '${users[0]}_${users[1]}';
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('messages')
+          .doc(chatId)
+          .set({
+            'isVanishMode': !_isVanishMode, // Toggle vanish mode
+          }, SetOptions(merge: true));
+
+      setState(() {
+        _isVanishMode = !_isVanishMode;
+      });
+
+      if (_isVanishMode) {
+        setState(() {
+          _messages.clear(); // Clear messages on Vanish Mode activation
+        });
+      }
+    } catch (e) {
+      debugPrint('Error toggling vanish mode: $e');
+    }
+  }
+
+  // Send a message
   Future<void> _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
 
@@ -100,25 +164,31 @@ class _ChatScreenState extends State<ChatScreen> {
     };
 
     try {
-      await FirebaseFirestore.instance
-          .collection('messages')
-          .doc(chatId)
-          .collection('chatMessages')
-          .add(messageObject);
+      // If vanish mode is not active, store the message in Firestore
+      if (!_isVanishMode) {
+        await FirebaseFirestore.instance
+            .collection('messages')
+            .doc(chatId)
+            .collection('chatMessages')
+            .add(messageObject);
+      }
 
+      // Emit the message via socket (always send, even in vanish mode)
       widget.socket.emit('message', {
         'message': message,
         'to': widget.peerId,
         'from': widget.userId,
+        'isVanishMode': _isVanishMode, // Send vanish mode status
       });
 
-      setState(() {
-        _messages.insert(0, {
-          'from': widget.userId,
-          'message': message,
+      // Add message to the local state only if vanish mode is off
+        setState(() {
+          _messages.insert(0, {
+            'from': widget.userId,
+            'message': message,
+          });
+          _messageController.clear();
         });
-        _messageController.clear();
-      });
     } catch (e) {
       debugPrint('Error sending message: $e');
     } finally {
@@ -126,6 +196,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // Initiate a call
   void _initiateCall(String peerId, String callType) {
     final callData = {
       'from': widget.userId,
@@ -133,10 +204,8 @@ class _ChatScreenState extends State<ChatScreen> {
       'type': callType,
     };
 
-    // Notify peer about the call
     widget.socket.emit('call', callData);
 
-    // Navigate to call screen
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -145,6 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // Handle incoming call
   void _handleIncomingCall(dynamic data) {
     Navigator.push(
       context,
@@ -160,6 +230,12 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text('Chat Page'),
         actions: [
+          IconButton(
+            icon: Icon(
+              _isVanishMode ? Icons.visibility_off : Icons.visibility,
+            ),
+            onPressed: _toggleVanishMode,
+          ),
           IconButton(
             icon: const Icon(Icons.call),
             onPressed: () {
@@ -215,15 +291,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 IconButton(
                   icon: Icon(
                     _isSending ? Icons.hourglass_empty : Icons.send,
-                    color: _isSending ? Colors.grey : Colors.blue,
                   ),
                   onPressed: _isSending
                       ? null
                       : () {
-                          String message = _messageController.text;
-                          if (message.isNotEmpty) {
-                            _sendMessage(message);
-                          }
+                          _sendMessage(_messageController.text);
                         },
                 ),
               ],

@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class RegisterPage extends StatefulWidget {
+class RegisterScreen extends StatefulWidget {
   @override
-  _RegisterPageState createState() => _RegisterPageState();
+  _RegisterScreenDemoState createState() => _RegisterScreenDemoState();
 }
 
-class _RegisterPageState extends State<RegisterPage>
+class _RegisterScreenDemoState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
+  final _userIdController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -33,35 +35,64 @@ class _RegisterPageState extends State<RegisterPage>
 
   @override
   void dispose() {
+    _userIdController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
-  // Helper function to check if input is an email
   bool isEmail(String input) {
     final emailRegex =
         RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     return emailRegex.hasMatch(input);
   }
 
-  // Register function
+  Future<bool> _checkIfUserIdExists(String userId) async {
+    final userDoc = await _firestore.collection('users').doc(userId).get();
+    return userDoc.exists;
+  }
+
+  Future<bool> _checkIfEmailExists(String email) async {
+    final querySnapshot = await _firestore
+        .collection('users')
+        .where('email', isEqualTo: email)
+        .get();
+    return querySnapshot.docs.isNotEmpty;
+  }
+
   Future<void> _register() async {
     try {
+      final userId = _userIdController.text.trim();
+      final username = _usernameController.text.trim();
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
 
-      if (email.isEmpty || password.isEmpty) {
+      if (userId.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter email and password')),
+          const SnackBar(content: Text('Please fill in all fields')),
         );
         return;
       }
 
       if (!isEmail(email)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter a valid email')),
+          const SnackBar(content: Text('Please enter a valid email')),
+        );
+        return;
+      }
+
+      if (await _checkIfUserIdExists(userId)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User ID already exists. Please choose another.')),
+        );
+        return;
+      }
+
+      if (await _checkIfEmailExists(email)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Email already exists. Please log in.')),
         );
         return;
       }
@@ -72,27 +103,40 @@ class _RegisterPageState extends State<RegisterPage>
         password: password,
       );
 
-      // Add user data to Firestore
-      await _firestore.collection('users').doc(userCredential.user?.uid).set({
+      await _firestore.collection('users').doc(userId).set({
+        'userId': userId,
+        'username': username,
         'email': email,
-        'userId': userCredential.user?.uid,
+        'lastSeen': FieldValue.serverTimestamp(),
+        'profilePic': '',
+        'status': 'offline',
+        'contacts': [],
+        'requestR': [],
+        'requestS': [],
+        'archiveMessages': [],
+        'additionalInfo': {
+          'bio': '',
+          'location': '',
+          'birthdate': null,
+          'phoneNumber': '',
+        },
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration Successful')),
+        const SnackBar(content: Text('Registration successful!')),
       );
 
-      // Navigate to login or home page
       Navigator.pushReplacementNamed(context, '/home');
     } on FirebaseAuthException catch (e) {
       String message = 'An error occurred, please try again.';
       if (e.code == 'email-already-in-use') {
-        message = 'The email is already in use by another account.';
+        message = 'This email is already registered.';
       } else if (e.code == 'weak-password') {
-        message = 'The password is too weak.';
+        message = 'Password must be at least 6 characters.';
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Unexpected error: $e')),
@@ -115,30 +159,40 @@ class _RegisterPageState extends State<RegisterPage>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(20.0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'Create a New Account',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    const Text(
+                      'Create a New Account',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 30),
                     BubbleTextField(
+                      controller: _userIdController,
+                      hint: 'Enter User ID',
+                      // label: 'User ID',
+                      icon: Icons.person,
+                    ),
+                    const SizedBox(height: 20),
+                    BubbleTextField(
+                      controller: _usernameController,
+                      hint: 'Enter Username',
+                      // label: 'Username',
+                      icon: Icons.account_circle,
+                    ),
+                    const SizedBox(height: 20),
+                    BubbleTextField(
                       controller: _emailController,
-                      hint: 'Enter email',
+                      hint: 'Enter Email',
+                      // label: 'Email',
                       icon: Icons.email,
                     ),
                     const SizedBox(height: 20),
                     BubbleTextField(
                       controller: _passwordController,
-                      hint: 'Enter password',
+                      hint: 'Enter Password',
+                      // label: 'Password',
                       icon: Icons.lock,
                       isPassword: true,
                     ),
@@ -150,12 +204,11 @@ class _RegisterPageState extends State<RegisterPage>
                     const SizedBox(height: 20),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/loginf');
+                        Navigator.pushNamed(context, '/login');
                       },
                       child: const Text(
                         'Already have an account? Login here',
-                        style:
-                            TextStyle(color: Color.fromARGB(255, 59, 10, 87)),
+                        style: TextStyle(color: Colors.purple),
                       ),
                     ),
                   ],
@@ -169,7 +222,6 @@ class _RegisterPageState extends State<RegisterPage>
   }
 }
 
-// Bubbled Background
 class AnimatedBackground extends StatelessWidget {
   const AnimatedBackground({Key? key}) : super(key: key);
 
@@ -177,16 +229,16 @@ class AnimatedBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xF7F7F9), // Pink background
+        color: Color(0xFFF7F7F9),
       ),
     );
   }
 }
 
-// TextField with Bubble Background
 class BubbleTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
+  // final String label;
   final IconData icon;
   final bool isPassword;
 
@@ -194,41 +246,56 @@ class BubbleTextField extends StatelessWidget {
     Key? key,
     required this.controller,
     required this.hint,
+    // required this.label,
     required this.icon,
     this.isPassword = false,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F9), // Whitish Grey
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1), // Lighter shadow color
-            blurRadius: 15.0, // Increase blur radius for a smoother shadow
-            spreadRadius: 5.0, // Spread the shadow a bit further
-            offset: const Offset(0, 4), // Vertical shadow offset
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Padding(
+        //   padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
+        //   child: Text(
+        //     label,
+        //     style: const TextStyle(
+        //       color: Colors.black,
+        //       fontSize: 14.0,
+        //       fontWeight: FontWeight.w500,
+        //     ),
+        //   ),
+        // ),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F7F9),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 15.0,
+                spreadRadius: 5.0,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle:
-              const TextStyle(color: Color(0xFFCACBCF)), // Grey placeholder
-          prefixIcon: Icon(icon, color: Colors.black),
-          border: InputBorder.none,
+          child: TextField(
+            controller: controller,
+            obscureText: isPassword,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: Color(0xFFCACBCF)),
+              prefixIcon: Icon(icon, color: Colors.black),
+              border: InputBorder.none,
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
-// Purple Button for Actions
 class PurpleButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
@@ -240,15 +307,11 @@ class PurpleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFFFB0FE), // PINK button
-        minimumSize: const Size.fromHeight(50), // Match text field size
+        backgroundColor: const Color(0xFFFFB0FE),
+        minimumSize: const Size.fromHeight(50),
       ),
       onPressed: onPressed,
-      child: Text(
-        text,
-        style:
-            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
+      child: Text(text),
     );
   }
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'chat_screen.dart';
-import 'connect.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:yapzap/screens/anonymous/anonymous_chat_lobby_page.dart';
+import 'package:yapzap/screens/chatpage.dart';
+import 'package:yapzap/screens/connect.dart';
+import 'package:yapzap/screens/user_profile_page.dart'; // Make sure the ConnectPage is available
 
 class Home extends StatefulWidget {
   final String userId;
@@ -12,257 +15,241 @@ class Home extends StatefulWidget {
   _HomeState createState() => _HomeState();
 }
 
-class _HomeState extends State<Home> {
+class _HomeState extends State<Home> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _searchQuery = '';
+  late IO.Socket socket;
+
+  // Page Controller for smooth sliding
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _connectSocket();
+  }
+
+  void _connectSocket() {
+    socket = IO.io(
+      'http://server-ouzf.onrender.com',
+      IO.OptionBuilder().setTransports(['websocket']).setQuery({'userId': widget.userId}).build(),
+    );
+
+    socket.on('connect', (_) => print('Connected to socket: ${socket.id}'));
+    socket.on('disconnect', (_) => print('Disconnected from socket'));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFF7F7F9), Color(0xFFFCFDFE)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Column(
-              children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 20.0,
-                    horizontal: 16.0,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF7F7F9), // Whitish Grey
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(12.0),
-                      bottomRight: Radius.circular(12.0),
-                    ),
-                  ),
-                  child: Text(
-                    'Chats',
-                    style: TextStyle(
-                      fontSize: 24.0,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black, // Black text
-                    ),
-                  ),
-                ),
-
-                // Status Update Section
-                Container(
-                  margin: const EdgeInsets.symmetric(
-                    vertical: 8.0,
-                    horizontal: 16.0,
-                  ),
-                  padding: const EdgeInsets.all(8.0),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFB0FE), // Pink background
-                    borderRadius: BorderRadius.circular(12.0),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Update Status',
-                        style: TextStyle(
-                          color: Colors.white, // White text
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.white),
-                        onPressed: () {
-                          // Action for updating status
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Search Bar
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search by user ID...',
-                      hintStyle: const TextStyle(
-                          color: Color(0xFFCACBCF)), // Grey placeholder
-                      filled: true,
-                      fillColor: Colors.white, // White background
-                      prefixIcon: const Icon(Icons.search, color: Colors.black),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
-                  ),
-                ),
-
-                // Chat List
-                Expanded(
-                  child: StreamBuilder<DocumentSnapshot>(
-                    stream: _firestore
-                        .collection('users')
-                        .doc(widget.userId)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError) {
-                        return const Center(
-                          child: Text(
-                            'Failed to load contacts. Please try again later.',
-                            style: TextStyle(color: Colors.black),
-                          ),
-                        );
-                      }
-
-                      if (!snapshot.hasData ||
-                          snapshot.data == null ||
-                          !snapshot.data!.exists) {
-                        return const Center(
-                          child: Text(
-                            'User data not found. Please check your account.',
-                            style: TextStyle(color: Colors.black),
-                          ),
-                        );
-                      }
-
-                      final userDoc = snapshot.data!;
-                      final data =
-                          userDoc.data() as Map<String, dynamic>? ?? {};
-                      final contacts =
-                          List<String>.from(data['contacts'] ?? []);
-
-                      final filteredContacts = contacts.where((contactId) {
-                        return contactId
-                            .toLowerCase()
-                            .contains(_searchQuery.toLowerCase());
-                      }).toList();
-
-                      return filteredContacts.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No contacts found.',
-                                style: TextStyle(
-                                    color: Color(0xFFCACBCF)), // Grey text
-                              ),
-                            )
-                          : ListView.builder(
-                              itemCount: filteredContacts.length,
-                              itemBuilder: (context, index) {
-                                final contactId = filteredContacts[index];
-
-                                return FutureBuilder<DocumentSnapshot>(
-                                  future: _firestore
-                                      .collection('users')
-                                      .doc(contactId)
-                                      .get(),
-                                  builder: (context, contactSnapshot) {
-                                    if (contactSnapshot.connectionState ==
-                                        ConnectionState.waiting) {
-                                      return const ListTile(
-                                        title: Text(
-                                          'Loading...',
-                                          style: TextStyle(color: Colors.black),
-                                        ),
-                                      );
-                                    }
-
-                                    if (contactSnapshot.hasError ||
-                                        !contactSnapshot.hasData ||
-                                        !contactSnapshot.data!.exists) {
-                                      return const ListTile(
-                                        title: Text(
-                                          'Error loading contact',
-                                          style: TextStyle(color: Colors.black),
-                                        ),
-                                      );
-                                    }
-
-                                    final contactData = contactSnapshot.data!
-                                        .data() as Map<String, dynamic>;
-                                    final username = contactData['username'] ??
-                                        'Unknown User';
-                                    final profilePic =
-                                        contactData['profilePic'] ?? '';
-
-                                    return ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundImage: profilePic.isNotEmpty
-                                            ? NetworkImage(profilePic)
-                                            : null,
-                                        child: profilePic.isEmpty
-                                            ? const Icon(Icons.person,
-                                                color: Colors.white)
-                                            : null,
-                                      ),
-                                      title: Text(username,
-                                          style: const TextStyle(
-                                              color: Colors.black)),
-                                      subtitle: Text(
-                                        'UserID: $contactId',
-                                        style: const TextStyle(
-                                            color: Color(0xFFCACBCF)), // Grey
-                                      ),
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => WebRTCChatApp(
-                                              userId: widget.userId,
-                                              peerId: contactId,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                );
-                              },
-                            );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Floating Action Button
-          Positioned(
-            bottom: 16.0,
-            right: 16.0,
-            child: FloatingActionButton(
-              backgroundColor: const Color(0xFF00A86B), // Green
-              onPressed: () {
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(
-                //     // builder: (context) => ConnectPage(userId: widget.userId),
-                //   ),
-                // );
-              },
-              child: const Icon(Icons.add, color: Colors.white), // White icon
-            ),
+      appBar: AppBar(
+        // backgroundColor: const Color(0xFFFFB0FE),
+        elevation: 0,
+        // title: const Text(
+        //   'Chats',
+        //   style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        // ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.black),
+            onPressed: () {
+              // Navigate to settings screen
+            },
           ),
         ],
       ),
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        children: [
+          _buildChatScreen(),
+          _buildAnonymousScreen(), // Chat screen content
+          UserProfilePage(userId: widget.userId ), // Anonymous screen content
+          // _buildProfileScreen(), // Profile screen content
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat),
+            label: 'Chat',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Anonymous',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ConnectPage(userId: widget.userId, socket: socket),
+                  ),
+                );
+              },
+              child: const Icon(Icons.add),
+              backgroundColor: const Color(0xFF00A86B),
+            )
+          : null, // Only show FAB on the Chat screen
     );
+  }
+
+  Widget _buildChatScreen() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () {
+            // Show a dialog to update the status
+          },
+          child: Container(
+            margin: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16.0),
+            height: 100.0, // Set explicit height for a taller container
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFB0FE),
+              borderRadius: BorderRadius.circular(12.0),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center, // Center content vertically
+              children: const [
+                Text(
+                  'Update Status',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16.0),
+                ),
+                Icon(Icons.edit, color: Colors.white, size: 24.0),
+              ],
+            ),
+          ),
+        ),
+        // Search Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search by user ID...',
+              filled: true,
+              fillColor: Colors.grey[200],
+              prefixIcon: const Icon(Icons.search, color: Colors.black),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) => setState(() {
+              _searchQuery = value;
+            }),
+          ),
+        ),
+
+        // Chat List
+        Expanded(
+          child: StreamBuilder<DocumentSnapshot>( 
+            stream: _firestore.collection('users').doc(widget.userId).snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return const Center(
+                  child: Text('Failed to load contacts. Try again.'),
+                );
+              }
+
+              if (!snapshot.hasData || !snapshot.data!.exists) {
+                return const Center(
+                  child: Text('User data not found.'),
+                );
+              }
+
+              final userDoc = snapshot.data!;
+              final contacts = List<String>.from(userDoc['contacts'] ?? []);
+              final filteredContacts = contacts.where((contactId) {
+                return contactId.toLowerCase().contains(_searchQuery.toLowerCase());
+              }).toList();
+
+              if (filteredContacts.isEmpty) {
+                return const Center(
+                  child: Text('No contacts found.'),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: filteredContacts.length,
+                itemBuilder: (context, index) {
+                  final contactId = filteredContacts[index];
+                  return ListTile(
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.person),
+                    ),
+                    title: Text(contactId),
+                    onTap: () {
+                      // Navigate to chat screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            userId: widget.userId,
+                            peerId: contactId,
+                            socket: socket,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnonymousScreen() {
+    // Navigate to the Anonymous Chat Lobby Page
+    return AnonymousChatLobbyPage();
+  }
+
+  // Widget _buildProfileScreen() {
+  //   return const UserProfilePage(userId: widget.userId );
+  // }
+
+  @override
+  void dispose() {
+    socket.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _searchController.dispose();
+    _pageController.dispose();
+    super.dispose();
   }
 }

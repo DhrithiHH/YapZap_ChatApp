@@ -21,6 +21,16 @@ class _RandomMatchmakingPageState extends State<RandomMatchmakingPage> {
     );
   }
 
+  void disconnectMatch() {
+    setState(() {
+      isSearching = false; // Set searching to false as the user disconnected
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Disconnected from the match.")),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,19 +73,41 @@ class _RandomMatchmakingPageState extends State<RandomMatchmakingPage> {
                     style: TextStyle(fontSize: 16, color: Colors.green),
                   ),
             SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: skipMatch,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFFD7AEF3), // Purple color from theme
-                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Skip button
+                ElevatedButton(
+                  onPressed: skipMatch,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFFD7AEF3), // Purple color from theme
+                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    "Skip",
+                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  ),
                 ),
-              ),
-              child: Text(
-                "Skip / Disconnect",
-                style: TextStyle(fontSize: 18, color: Colors.white),
-              ),
+                SizedBox(width: 20),
+                // Disconnect button
+                ElevatedButton(
+                  onPressed: disconnectMatch,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red, // Red color for disconnect
+                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    "Disconnect",
+                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
